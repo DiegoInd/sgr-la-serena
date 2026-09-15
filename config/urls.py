@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from mantenedores.views import vista_wireframe
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('wireframe-front/', vista_wireframe, name='wireframe_front'),
 ]
