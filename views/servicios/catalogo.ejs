@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGR La Serena - Catálogo de Servicios</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/wireframe-front">SGR La Serena - Sistema de Gestión</a>
+            <div>
+                <a href="/wireframe-front" class="btn btn-sm btn-outline-light me-2">Gestión de Metas</a>
+                <a href="/admin/" class="btn btn-sm btn-outline-light me-2">Administración</a>
+                <% if (user && user.is_authenticated) { %>
+                    <form action="/logout" method="post" class="d-inline m-0">
+                        <button type="submit" class="btn btn-sm btn-light text-primary fw-bold">Cerrar Sesión</button>
+                    </form>
+                <% } else { %>
+                    <a href="/login" class="btn btn-sm btn-light text-primary fw-bold">Ingresar</a>
+                <% } %>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h3 class="fw-bold text-primary mb-1">Catálogo de Servicios Municipales</h3>
+                <p class="text-muted mb-0">Listado oficial de prestaciones y servicios vinculados a las metas institucionales de La Serena.</p>
+            </div>
+            <a href="/wireframe-front" class="btn btn-outline-secondary">&larr; Volver a Metas</a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <input type="text" id="serviceSearch" class="form-control" placeholder="Buscar servicio por nombre..." onkeyup="filterServices()">
+            </div>
+            <div class="col-md-3">
+                <select id="categoryFilter" class="form-select" onchange="filterServices()">
+                    <option value="">Todas las categorías</option>
+                    <option value="DIDECO">DIDECO</option>
+                    <option value="Rentas y Patentes">Rentas y Patentes</option>
+                    <option value="Seguridad Ciudadana">Seguridad Ciudadana</option>
+                    <option value="Operaciones">Operaciones</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row g-4" id="servicesGrid">
+            <% servicios.forEach(s => { %>
+                <div class="col-md-6 col-lg-3 service-item" data-name="<%= s.nombre_servicio.toLowerCase() %>" data-category="<%= s.categoria %>">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="badge bg-light text-primary border"><%= s.categoria %></span>
+                                <% if (s.activo) { %>
+                                    <span class="badge bg-success">Activo</span>
+                                <% } else { %>
+                                    <span class="badge bg-secondary">Inactivo</span>
+                                <% } %>
+                            </div>
+                            <h5 class="card-title fw-bold text-dark mt-2"><%= s.nombre_servicio %></h5>
+                            <p class="card-text text-muted small">Servicio habilitado para ponderación en metas municipales de las delegaciones.</p>
+                        </div>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+
+    <script>
+        function filterServices() {
+            const query = document.getElementById('serviceSearch').value.toLowerCase();
+            const cat = document.getElementById('categoryFilter').value;
+            const items = document.querySelectorAll('.service-item');
+
+            items.forEach(el => {
+                const name = el.getAttribute('data-name');
+                const category = el.getAttribute('data-category');
+                const matchesName = name.includes(query);
+                const matchesCat = !cat || category === cat;
+
+                if (matchesName && matchesCat) {
+                    el.style.display = 'block';
+                } else {
+                    el.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGR La Serena - Panel de Administración</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/admin/">⚙️ SGR La Serena - Panel de Administración</a>
+            <div>
+                <a href="/wireframe-front" class="btn btn-sm btn-outline-light me-2">Ver Metas (Sitio)</a>
+                <a href="/catalogo-servicios" class="btn btn-sm btn-outline-light me-2">Catálogo de Servicios</a>
+                <form action="/admin/reset-demo/" method="post" class="d-inline me-2" onsubmit="return confirm('¿Restablecer datos de prueba a los valores iniciales?')">
+                    <button type="submit" class="btn btn-sm btn-outline-warning">Restablecer Demo</button>
+                </form>
+                <a href="/logout" class="btn btn-sm btn-danger">Cerrar Sesión</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container pb-5">
+        <% if (messages && messages.length > 0) { %>
+            <% messages.forEach(message => { %>
+                <div class="alert alert-<%= message.tags === 'error' ? 'danger' : message.tags %> alert-dismissible fade show mb-4" role="alert">
+                    <%= message.text %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% }) %>
+        <% } %>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h3 class="fw-bold text-dark mb-1">Mantenedores del Sistema</h3>
+                <p class="text-muted mb-0">Gestión de delegaciones, períodos contables, catálogo de prestaciones y usuarios del SGR Municipal.</p>
+            </div>
+        </div>
+
+        <!-- 3 Columns for Mantenedores -->
+        <div class="row g-4 mb-4">
+            <!-- Delegaciones -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Delegaciones Municipales</span>
+                        <button type="button" class="btn btn-sm btn-light text-primary fw-bold" data-bs-toggle="modal" data-bs-target="#newDelegacionModal">+ Nueva</button>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <% delegaciones.forEach(d => { %>
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                <div>
+                                    <div class="fw-bold"><%= d.nombre %></div>
+                                    <small class="text-muted">ID #<%= d.id %></small>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <form action="/admin/delegacion/<%= d.id %>/toggle/" method="post" class="m-0">
+                                        <% if (d.activa) { %>
+                                            <button type="submit" class="btn btn-sm btn-outline-success">Activa (Desactivar)</button>
+                                        <% } else { %>
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Inactiva (Activar)</button>
+                                        <% } %>
+                                    </form>
+                                </div>
+                            </li>
+                        <% }) %>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Períodos -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Períodos de Evaluación</span>
+                        <button type="button" class="btn btn-sm btn-light text-primary fw-bold" data-bs-toggle="modal" data-bs-target="#newPeriodoModal">+ Nuevo</button>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <% periodos.forEach(p => { %>
+                            <li class="list-group-item py-3">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <div class="fw-bold"><%= p.label %></div>
+                                    <form action="/admin/periodo/<%= p.id %>/toggle/" method="post" class="m-0">
+                                        <button type="submit" class="btn btn-sm <%= p.activo ? 'btn-outline-success' : 'btn-outline-secondary' %>">
+                                            <%= p.activo ? 'Vigente' : 'Cerrado' %>
+                                        </button>
+                                    </form>
+                                </div>
+                                <small class="text-muted">Días computables: <strong><%= p.dias_computables %></strong> | Fechas: <%= p.fecha_inicio %> al <%= p.fecha_fin %></small>
+                            </li>
+                        <% }) %>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Catálogo de Servicios -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">Catálogo de Servicios</span>
+                        <button type="button" class="btn btn-sm btn-light text-primary fw-bold" data-bs-toggle="modal" data-bs-target="#newServicioModal">+ Nuevo</button>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <% servicios.forEach(s => { %>
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                <div>
+                                    <div class="fw-bold"><%= s.nombre_servicio %></div>
+                                    <small class="text-muted">Área: <span class="badge text-bg-light border"><%= s.categoria %></span></small>
+                                </div>
+                                <form action="/admin/servicio/<%= s.id %>/toggle/" method="post" class="m-0">
+                                    <button type="submit" class="btn btn-sm <%= s.activo ? 'btn-outline-success' : 'btn-outline-secondary' %>">
+                                        <%= s.activo ? 'Activo' : 'Pausado' %>
+                                    </button>
+                                </form>
+                            </li>
+                        <% }) %>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuarios del Sistema -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-primary">Usuarios y Perfiles (RBAC)</h5>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newUsuarioModal">+ Nuevo Usuario</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Correo Electrónico</th>
+                            <th>Rol Municipal</th>
+                            <th>Delegación</th>
+                            <th>Acceso Rápido</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% users.forEach(u => { %>
+                            <tr>
+                                <td><strong><%= u.username %></strong> <%= u.is_superuser ? '⭐ (Superusuario)' : '' %></td>
+                                <td><%= u.email %></td>
+                                <td><span class="badge bg-secondary"><%= u.rol %></span></td>
+                                <td><%= u.delegacionNombre %></td>
+                                <td>
+                                    <a href="/demo-login/<%= u.username %>" class="btn btn-sm btn-outline-primary">Ingresar como <%= u.username %></a>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Metas y Acción de Archivo en Lote (Django Admin Action: archive_metas) -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-primary">Control de Metas (Acción en Lote / Batch Archive)</h5>
+            </div>
+            <form action="/admin/metas/archivar-lote/" method="post">
+                <div class="p-3 bg-light border-bottom d-flex align-items-center">
+                    <span class="me-2 small fw-semibold">Acción seleccionada:</span>
+                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold" onclick="return confirm('¿Archivar todas las metas seleccionadas?')">
+                        Archivar metas seleccionadas (Borrado Lógico)
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40px;"><input type="checkbox" id="selectAllMetas" onchange="toggleAllMetas(this)"></th>
+                                <th>ID</th>
+                                <th>Cargo / Usuario</th>
+                                <th>Delegación</th>
+                                <th>Período</th>
+                                <th>Ponderación</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% metas.forEach(m => { %>
+                                <tr>
+                                    <td>
+                                        <% if (!m.deleted_at) { %>
+                                            <input type="checkbox" name="meta_ids" value="<%= m.id %>" class="meta-checkbox">
+                                        <% } %>
+                                    </td>
+                                    <td>#<%= m.id %></td>
+                                    <td><strong><%= m.cargo_o_usuario %></strong></td>
+                                    <td><%= m.delegacionNombre %></td>
+                                    <td><%= m.periodoLabel %></td>
+                                    <td><span class="badge bg-primary"><%= m.ponderacion %>%</span></td>
+                                    <td>
+                                        <% if (m.deleted_at) { %>
+                                            <span class="badge bg-danger">Archivada</span>
+                                        <% } else { %>
+                                            <span class="badge bg-success">Activa</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Nueva Delegacion -->
+    <div class="modal fade" id="newDelegacionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/admin/delegacion/nueva/" method="post">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold">Agregar Delegación Municipal</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Nombre de la Delegación:</label>
+                            <input type="text" name="nombre" class="form-control" placeholder="Ej: Delegación La Pampa" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Guardar Delegación</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Nuevo Periodo -->
+    <div class="modal fade" id="newPeriodoModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/admin/periodo/nuevo/" method="post">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold">Crear Período de Evaluación</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Fecha de Inicio:</label>
+                            <input type="date" name="fecha_inicio" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Fecha de Fin:</label>
+                            <input type="date" name="fecha_fin" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Días Computables:</label>
+                            <input type="number" name="dias_computables" class="form-control" value="240" min="1" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Crear Período</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Nuevo Servicio -->
+    <div class="modal fade" id="newServicioModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/admin/servicio/nuevo/" method="post">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold">Incorporar Servicio al Catálogo</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Nombre del Servicio:</label>
+                            <input type="text" name="nombre_servicio" class="form-control" placeholder="Ej: Atención Social de Urgencia" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Categoría / Dirección:</label>
+                            <input type="text" name="categoria" class="form-control" placeholder="Ej: DIDECO" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Guardar Servicio</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Nuevo Usuario -->
+    <div class="modal fade" id="newUsuarioModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form action="/admin/usuario/nuevo/" method="post">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold">Crear Usuario del Sistema</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Nombre de Usuario:</label>
+                            <input type="text" name="username" class="form-control" placeholder="Ej: j.perez" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Correo Electrónico:</label>
+                            <input type="email" name="email" class="form-control" placeholder="jperez@laserena.cl" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Contraseña Inicial:</label>
+                            <input type="password" name="password" class="form-control" placeholder="Mínimo 8 caracteres" minlength="8" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Rol Municipal:</label>
+                            <select name="rol" class="form-select" required>
+                                <option value="FUNCIONARIO">Funcionario</option>
+                                <option value="DELEGADO">Delegado</option>
+                                <option value="VERIFICADOR">Verificador</option>
+                                <option value="ADMIN">Administrador</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Delegación Asignada:</label>
+                            <select name="delegacion_id" class="form-select" required>
+                                <% delegaciones.forEach(d => { %>
+                                    <% if (d.activa) { %>
+                                        <option value="<%= d.id %>"><%= d.nombre %></option>
+                                    <% } %>
+                                <% }) %>
+                            </select>
+                            <small class="text-muted">Solo se listan delegaciones activas (conforme a la regla del modelo original).</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Crear Usuario</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleAllMetas(source) {
+            const checkboxes = document.querySelectorAll('.meta-checkbox');
+            checkboxes.forEach(cb => cb.checked = source.checked);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGR La Serena - Registro de Metas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .meta-desc {
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-3 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/wireframe-front">
+                🏛️ SGR La Serena - Sistema de Gestión
+            </a>
+            <div class="d-flex align-items-center">
+                <a href="/catalogo-servicios" class="btn btn-sm btn-outline-light me-2">Catálogo de Servicios</a>
+                <a href="/admin/" class="btn btn-sm btn-outline-light me-3">Administración</a>
+                
+                <span class="navbar-text text-white d-flex align-items-center">
+                    <% if (user && user.is_authenticated) { %>
+                        <span class="me-3 small">
+                            Usuario: <strong><%= user.username %></strong> 
+                            <span class="badge bg-light text-primary ms-1"><%= user.rol %></span>
+                            | Delegación: <strong><%= user.perfilusuario && user.perfilusuario.delegacion ? user.perfilusuario.delegacion.nombre : 'Global' %></strong>
+                        </span>
+                        <form action="/logout" method="post" class="d-inline m-0">
+                            <button type="submit" class="btn btn-sm btn-light text-primary fw-bold">Cerrar Sesión</button>
+                        </form>
+                    <% } else { %>
+                        <a href="/login" class="btn btn-sm btn-light text-primary fw-bold">Ingresar</a>
+                    <% } %>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <!-- Quick Switch Demo Bar for convenient testing -->
+        <div class="alert alert-light border shadow-sm d-flex flex-wrap justify-content-between align-items-center py-2 px-3 mb-3 small rounded-3">
+            <div>
+                <strong class="text-secondary">Cambio rápido de perfil (Demo):</strong>
+                <a href="/demo-login/admin" class="badge text-bg-primary text-decoration-none me-1">Admin (Superusuario)</a>
+                <a href="/demo-login/funcionario1" class="badge text-bg-info text-decoration-none me-1">Funcionario Centro</a>
+                <a href="/demo-login/delegado_companias" class="badge text-bg-warning text-decoration-none me-1">Delegado Las Compañías</a>
+                <a href="/demo-login/verificador_municipal" class="badge text-bg-secondary text-decoration-none me-1">Verificador</a>
+            </div>
+            <div>
+                <a href="/admin/" class="text-decoration-none text-primary fw-semibold">⚙️ Panel Admin &rarr;</a>
+            </div>
+        </div>
+
+        <!-- Flash messages -->
+        <% if (messages && messages.length > 0) { %>
+            <% messages.forEach(message => { %>
+                <div class="alert alert-<%= message.tags === 'error' ? 'danger' : message.tags %> alert-dismissible fade show mb-3" role="alert">
+                    <%= message.text %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% }) %>
+        <% } %>
+
+        <!-- Ponderación Progress Bar -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body py-2 px-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="small fw-semibold text-secondary">
+                        Ponderación total acumulada (Metas activas del período): 
+                        <strong class="<%= totalPonderacion === 100 ? 'text-success' : (totalPonderacion > 100 ? 'text-danger' : 'text-primary') %>"><%= totalPonderacion %>%</strong>
+                    </span>
+                    <span class="badge <%= totalPonderacion === 100 ? 'bg-success' : (totalPonderacion > 100 ? 'bg-danger' : 'bg-primary') %>">
+                        <%= totalPonderacion === 100 ? '✓ Ponderación 100% Completa' : (totalPonderacion > 100 ? '⚠️ Excede el 100%' : `${100 - totalPonderacion}% restante para meta óptima`) %>
+                    </span>
+                </div>
+                <div class="progress" style="height: 8px;">
+                    <div class="progress-bar <%= totalPonderacion === 100 ? 'bg-success' : (totalPonderacion > 100 ? 'bg-danger' : 'bg-primary') %>" 
+                         role="progressbar" 
+                         style="width: <%= Math.min(100, totalPonderacion) %>%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header actions & tabs -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <div class="d-flex align-items-center">
+                <h4 class="text-primary fw-bold mb-0 me-3">Metas y Ponderaciones Asignadas</h4>
+                <!-- Active vs Archived Tabs -->
+                <ul class="nav nav-pills nav-fill small">
+                    <li class="nav-item">
+                        <a class="nav-link py-1 px-3 <%= !showArchived ? 'active' : '' %>" href="/wireframe-front">Activas</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-1 px-3 <%= showArchived ? 'active bg-secondary' : 'text-secondary' %>" href="/wireframe-front?status=archivadas">Archivadas</a>
+                    </li>
+                </ul>
+            </div>
+
+            <% if (perms && perms.mantenedores && perms.mantenedores.add_meta && !showArchived) { %>
+                <a href="/wireframe-front/meta/nueva/" class="btn btn-primary fw-bold shadow-sm">+ Registrar Nueva Meta</a>
+            <% } %>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body py-2 px-3">
+                <form method="get" action="/wireframe-front" class="row g-2 align-items-center">
+                    <% if (showArchived) { %>
+                        <input type="hidden" name="status" value="archivadas">
+                    <% } %>
+                    <div class="col-md-4">
+                        <input type="text" name="q" class="form-control form-control-sm" placeholder="Buscar por cargo o descripción..." value="<%= searchQuery || '' %>">
+                    </div>
+                    <% if (user && (user.is_superuser || user.rol === 'ADMIN')) { %>
+                    <div class="col-md-3">
+                        <select name="delegacion" class="form-select form-select-sm">
+                            <option value="">Todas las Delegaciones</option>
+                            <% delegaciones.forEach(d => { %>
+                                <option value="<%= d.id %>" <%= (selectedDelegacion == d.id) ? 'selected' : '' %>><%= d.nombre %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <% } %>
+                    <div class="col-md-3">
+                        <select name="periodo" class="form-select form-select-sm">
+                            <option value="">Todos los Períodos</option>
+                            <% periodos.forEach(p => { %>
+                                <option value="<%= p.id %>" <%= (selectedPeriodo == p.id) ? 'selected' : '' %>><%= p.label %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex">
+                        <button type="submit" class="btn btn-sm btn-outline-primary w-100 me-1">Filtrar</button>
+                        <a href="/wireframe-front<%= showArchived ? '?status=archivadas' : '' %>" class="btn btn-sm btn-outline-secondary" title="Limpiar filtros">✕</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Metas Table -->
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Cargo / Usuario</th>
+                            <th>Delegación</th>
+                            <th>Período</th>
+                            <th>Ponderación</th>
+                            <th>Descripción</th>
+                            <th>Evidencia</th>
+                            <th class="text-end pe-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (page_obj && page_obj.metas && page_obj.metas.length > 0) { %>
+                            <% page_obj.metas.forEach(meta => { %>
+                            <tr>
+                                <td>
+                                    <strong><%= meta.cargo_o_usuario %></strong>
+                                </td>
+                                <td>
+                                    <span class="badge text-bg-light border text-secondary"><%= meta.delegacionNombre %></span>
+                                </td>
+                                <td><small class="text-muted"><%= meta.periodoLabel %></small></td>
+                                <td><span class="badge bg-primary fs-6"><%= meta.ponderacion %>%</span></td>
+                                <td>
+                                    <div class="meta-desc text-muted small" title="<%= meta.descripcion %>">
+                                        <%= meta.descripcion %>
+                                    </div>
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small js-view-desc" 
+                                            data-cargo="<%= meta.cargo_o_usuario %>" 
+                                            data-desc="<%= meta.descripcion %>">
+                                        ver completa
+                                    </button>
+                                </td>
+                                <td>
+                                    <% if (meta.evidencia) { %>
+                                        <button type="button" class="btn btn-sm btn-outline-info js-preview-img" data-src="<%= meta.evidencia %>" data-title="<%= meta.cargo_o_usuario %>">
+                                            🔍 Ver Archivo
+                                        </button>
+                                    <% } else { %>
+                                        <span class="text-muted small">Sin evidencia</span>
+                                    <% } %>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <% if (!meta.deleted_at) { %>
+                                        <% if (perms && perms.mantenedores && perms.mantenedores.change_meta) { %>
+                                            <a href="/wireframe-front/meta/<%= meta.id %>/editar/" class="btn btn-sm btn-outline-primary me-1">Editar</a>
+                                        <% } %>
+                                        <% if (perms && perms.mantenedores && perms.mantenedores.delete_meta) { %>
+                                            <form id="delete-form-<%= meta.id %>" action="/wireframe-front/meta/<%= meta.id %>/eliminar/" method="post" class="d-inline">
+                                                <button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-id="<%= meta.id %>">Archivar</button>
+                                            </form>
+                                        <% } %>
+                                    <% } else { %>
+                                        <form id="restore-form-<%= meta.id %>" action="/wireframe-front/meta/<%= meta.id %>/restaurar/" method="post" class="d-inline">
+                                            <button type="button" class="btn btn-sm btn-outline-success js-restore-btn" data-id="<%= meta.id %>">Restaurar</button>
+                                        </form>
+                                    <% } %>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <div class="fs-5 mb-1">No se encontraron metas registradas.</div>
+                                    <small><%= showArchived ? 'No existen registros archivados.' : 'Puede registrar una nueva meta con el botón superior.' %></small>
+                                </td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer: Selector de Paginación y Botones -->
+            <% if (page_obj && page_obj.paginator && page_obj.paginator.count > 0) { %>
+            <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center py-3">
+                <div class="d-flex align-items-center mb-2 mb-md-0">
+                    <span class="me-2 text-muted small">Registros por página:</span>
+                    <select class="form-select form-select-sm w-auto" onchange="const u = new URL(window.location.href); u.searchParams.set('page_size', this.value); u.searchParams.set('page', '1'); window.location.href = u.toString();">
+                        <option value="5" <%= page_size === 5 ? 'selected' : '' %>>5</option>
+                        <option value="15" <%= page_size === 15 ? 'selected' : '' %>>15</option>
+                        <option value="30" <%= page_size === 30 ? 'selected' : '' %>>30</option>
+                    </select>
+                    <span class="ms-3 text-muted small">Total: <%= page_obj.paginator.count %> registros</span>
+                </div>
+
+                <% if (page_obj.paginator.num_pages > 1) { %>
+                <nav aria-label="Navegación de metas">
+                    <ul class="pagination pagination-sm mb-0">
+                        <% if (page_obj.has_previous) { %>
+                            <li class="page-item">
+                                <a class="page-link" href="javascript:void(0)" onclick="const u = new URL(window.location.href); u.searchParams.set('page', '<%= page_obj.previous_page_number %>'); window.location.href = u.toString();">Anterior</a>
+                            </li>
+                        <% } else { %>
+                            <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+                        <% } %>
+
+                        <li class="page-item active"><span class="page-link"><%= page_obj.number %> / <%= page_obj.paginator.num_pages %></span></li>
+
+                        <% if (page_obj.has_next) { %>
+                            <li class="page-item">
+                                <a class="page-link" href="javascript:void(0)" onclick="const u = new URL(window.location.href); u.searchParams.set('page', '<%= page_obj.next_page_number %>'); window.location.href = u.toString();">Siguiente</a>
+                            </li>
+                        <% } else { %>
+                            <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+                        <% } %>
+                    </ul>
+                </nav>
+                <% } %>
+            </div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Modal Formulario (Crear / Editar Meta) -->
+    <% if (form) { %>
+    <div class="modal fade" id="metaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <form method="post" enctype="multipart/form-data" action="<%= object ? `/wireframe-front/meta/${object.id}/editar/` : '/wireframe-front/meta/nueva/' %>">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold"><%= object ? 'Editar Meta Institucional' : 'Registrar Nueva Meta' %></h5>
+                        <a href="/wireframe-front" class="btn-close btn-close-white"></a>
+                    </div>
+                    <div class="modal-body">
+                        <% if (user && (user.is_superuser || user.rol === 'ADMIN')) { %>
+                        <div class="mb-3">
+                            <label for="id_delegacion" class="form-label fw-semibold">Delegación Asignada:</label>
+                            <select name="delegacion" id="id_delegacion" class="form-select" required>
+                                <% delegaciones.forEach(d => { %>
+                                    <option value="<%= d.id %>" <%= (form.delegacion == d.id) ? 'selected' : '' %>><%= d.nombre %> <%= !d.activa ? '(Inactiva)' : '' %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <% } %>
+
+                        <div class="mb-3">
+                            <label for="id_cargo_o_usuario" class="form-label fw-semibold">Cargo / Funcionario Asignado:</label>
+                            <input type="text" name="cargo_o_usuario" id="id_cargo_o_usuario" class="form-control" placeholder="Ej: Analista de Atención Ciudadana" value="<%= form.cargo_o_usuario || '' %>" required autofocus>
+                            <% if (form.errors && form.errors.cargo_o_usuario) { %>
+                                <div class="text-danger small mt-1"><%= form.errors.cargo_o_usuario %></div>
+                            <% } %>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_periodo" class="form-label fw-semibold">Período de Evaluación:</label>
+                            <select name="periodo" id="id_periodo" class="form-select" required>
+                                <% periodos.forEach(p => { %>
+                                    <option value="<%= p.id %>" <%= (form.periodo == p.id) ? 'selected' : '' %>><%= p.label %></option>
+                                <% }) %>
+                            </select>
+                            <% if (form.errors && form.errors.periodo) { %>
+                                <div class="text-danger small mt-1"><%= form.errors.periodo %></div>
+                            <% } %>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_ponderacion" class="form-label fw-semibold">Ponderación (% de 1 a 100):</label>
+                            <input type="number" name="ponderacion" id="id_ponderacion" class="form-control" min="1" max="100" placeholder="Ej: 30" value="<%= form.ponderacion || '' %>" required>
+                            <% if (form.errors && form.errors.ponderacion) { %>
+                                <div class="text-danger small mt-1"><%= form.errors.ponderacion %></div>
+                            <% } %>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_descripcion" class="form-label fw-semibold">Descripción del Compromiso / Meta:</label>
+                            <textarea name="descripcion" id="id_descripcion" class="form-control" rows="3" placeholder="Detalle de las actividades y metas cuantificables..." required><%= form.descripcion || '' %></textarea>
+                            <% if (form.errors && form.errors.descripcion) { %>
+                                <div class="text-danger small mt-1"><%= form.errors.descripcion %></div>
+                            <% } %>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="id_evidencia" class="form-label fw-semibold">Evidencia (Opcional - Imagen JPG o PNG, máx 2MB):</label>
+                            <input type="file" name="evidencia" id="id_evidencia" class="form-control" accept=".jpg,.jpeg,.png">
+                            <% if (object && object.evidencia) { %>
+                                <div class="form-text mt-1">Archivo actual: <a href="<%= object.evidencia %>" target="_blank">Ver evidencia adjunta</a></div>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="/wireframe-front" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-primary fw-bold">Guardar Meta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Modal Previsualización de Evidencia -->
+    <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="previewModalTitle">Evidencia Adjunta</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-3 bg-light">
+                    <img id="previewModalImg" src="" alt="Evidencia" class="img-fluid rounded shadow-sm border" style="max-height: 500px; object-fit: contain;">
+                </div>
+                <div class="modal-footer">
+                    <a id="previewModalLink" href="" target="_blank" class="btn btn-sm btn-outline-primary">Abrir en pestaña nueva</a>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Descripción Completa -->
+    <div class="modal fade" id="descModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="descModalCargo">Descripción de la Meta</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="descModalText" class="mb-0 text-dark" style="white-space: pre-wrap;"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto open form modal if open_modal is true
+        <% if (open_modal) { %>
+            document.addEventListener("DOMContentLoaded", function () {
+                const modalElement = document.getElementById("metaModal");
+                if (modalElement) {
+                    const modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                }
+            });
+        <% } %>
+
+        // SweetAlert2 for Delete/Archive confirmation
+        document.querySelectorAll(".js-delete-btn").forEach(button => {
+            button.addEventListener("click", function () {
+                const metaId = this.getAttribute("data-id");
+                Swal.fire({
+                    title: "¿Archivar esta meta?",
+                    text: "El registro pasará al historial de metas archivadas (borrado lógico).",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "Sí, archivar",
+                    cancelButtonText: "Cancelar",
+                    confirmButtonColor: "#dc3545"
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById(`delete-form-${metaId}`).submit();
+                    }
+                });
+            });
+        });
+
+        // SweetAlert2 for Restore confirmation
+        document.querySelectorAll(".js-restore-btn").forEach(button => {
+            button.addEventListener("click", function () {
+                const metaId = this.getAttribute("data-id");
+                Swal.fire({
+                    title: "¿Restaurar esta meta?",
+                    text: "El registro volverá a estar activo en el período correspondiente.",
+                    icon: "question",
+                    showCancelButton: true,
+                    confirmButtonText: "Sí, restaurar",
+                    cancelButtonText: "Cancelar",
+                    confirmButtonColor: "#198754"
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById(`restore-form-${metaId}`).submit();
+                    }
+                });
+            });
+        });
+
+        // Lightbox image preview modal
+        document.querySelectorAll(".js-preview-img").forEach(btn => {
+            btn.addEventListener("click", function () {
+                const src = this.getAttribute("data-src");
+                const title = this.getAttribute("data-title");
+                document.getElementById("previewModalImg").src = src;
+                document.getElementById("previewModalLink").href = src;
+                document.getElementById("previewModalTitle").textContent = "Evidencia: " + title;
+                const modal = new bootstrap.Modal(document.getElementById("previewModal"));
+                modal.show();
+            });
+        });
+
+        // Full description modal
+        document.querySelectorAll(".js-view-desc").forEach(btn => {
+            btn.addEventListener("click", function () {
+                const cargo = this.getAttribute("data-cargo");
+                const desc = this.getAttribute("data-desc");
+                document.getElementById("descModalCargo").textContent = cargo;
+                document.getElementById("descModalText").textContent = desc;
+                const modal = new bootstrap.Modal(document.getElementById("descModal"));
+                modal.show();
+            });
+        });
+    </script>
+</body>
+</html>

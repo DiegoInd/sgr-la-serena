@@ -1,0 +1,166 @@
+{
+  "delegaciones": [
+    {
+      "id": 1,
+      "nombre": "Delegación La Serena Centro",
+      "activa": true
+    },
+    {
+      "id": 2,
+      "nombre": "Delegación Las Compañías",
+      "activa": true
+    },
+    {
+      "id": 3,
+      "nombre": "Delegación Rural (Algarrobito y El Romero)",
+      "activa": true
+    },
+    {
+      "id": 4,
+      "nombre": "Delegación Avenida del Mar",
+      "activa": false
+    }
+  ],
+  "periodos": [
+    {
+      "id": 1,
+      "fecha_inicio": "2026-01-01",
+      "fecha_fin": "2026-12-31",
+      "dias_computables": 240,
+      "activo": true,
+      "label": "Período 2026 (2026-01-01 a 2026-12-31)"
+    },
+    {
+      "id": 2,
+      "fecha_inicio": "2025-01-01",
+      "fecha_fin": "2025-12-31",
+      "dias_computables": 245,
+      "activo": false,
+      "label": "Período 2025 (2025-01-01 a 2025-12-31)"
+    }
+  ],
+  "servicios": [
+    {
+      "id": 1,
+      "nombre_servicio": "Atención y Orientación Social",
+      "categoria": "DIDECO",
+      "activo": true
+    },
+    {
+      "id": 2,
+      "nombre_servicio": "Recepción y Tramitación de Permisos",
+      "categoria": "Rentas y Patentes",
+      "activo": true
+    },
+    {
+      "id": 3,
+      "nombre_servicio": "Fiscalización en Vía Pública",
+      "categoria": "Seguridad Ciudadana",
+      "activo": true
+    },
+    {
+      "id": 4,
+      "nombre_servicio": "Mantenimiento de Áreas Verdes",
+      "categoria": "Operaciones",
+      "activo": true
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@laserena.cl",
+      "passwordHash": "$2a$08$eegsXA5ZDc6oosRDCh/4puJSATg5TmP6fLYYRgGko6hPq1knmr4de",
+      "is_superuser": true,
+      "delegacion_id": 1,
+      "rol": "ADMIN"
+    },
+    {
+      "id": 2,
+      "username": "funcionario1",
+      "email": "funcionario@laserena.cl",
+      "passwordHash": "$2a$08$A/P75gK/4m/5aT/YyCPzeuBE6rzcSvFD9PjEF4nq5zPQC2YgZotFe",
+      "is_superuser": false,
+      "delegacion_id": 1,
+      "rol": "FUNCIONARIO"
+    },
+    {
+      "id": 3,
+      "username": "delegado_companias",
+      "email": "delegado@laserena.cl",
+      "passwordHash": "$2a$08$7/S.OpsCFLP6Jl.IGgCHie4Hrynro.Wor6P61IoQABRP8MGN0yBN2",
+      "is_superuser": false,
+      "delegacion_id": 2,
+      "rol": "DELEGADO"
+    },
+    {
+      "id": 4,
+      "username": "verificador_municipal",
+      "email": "verificador@laserena.cl",
+      "passwordHash": "$2a$08$.FZyL/WuLwlcL0KLGU/9hO8B.XHOVGXguUjHUj2Aecgd9UTFRerTm",
+      "is_superuser": false,
+      "delegacion_id": 1,
+      "rol": "VERIFICADOR"
+    }
+  ],
+  "metas": [
+    {
+      "id": 1,
+      "delegacion_id": 1,
+      "cargo_o_usuario": "Analista de Atención Ciudadana",
+      "descripcion": "Atención y resolución oportuna de solicitudes ciudadanas presenciales en Delegación Centro.",
+      "ponderacion": 30,
+      "periodo_id": 1,
+      "evidencia": "/media/evidencias/2026/10/hjhjhjj.jpg",
+      "deleted_at": null
+    },
+    {
+      "id": 2,
+      "delegacion_id": 1,
+      "cargo_o_usuario": "Coordinador de Terreno",
+      "descripcion": "Inspecciones técnicas en terreno y levantamiento de requerimientos comunales.",
+      "ponderacion": 40,
+      "periodo_id": 1,
+      "evidencia": "/media/evidencias/2026/10/images_1.jpg",
+      "deleted_at": null
+    },
+    {
+      "id": 3,
+      "delegacion_id": 1,
+      "cargo_o_usuario": "Encargado de Gestión Social",
+      "descripcion": "Seguimiento y apoyo a programas sociales en sectores prioritarios.",
+      "ponderacion": 30,
+      "periodo_id": 1,
+      "evidencia": null,
+      "deleted_at": null
+    },
+    {
+      "id": 4,
+      "delegacion_id": 2,
+      "cargo_o_usuario": "Jefe de Delegación Las Compañías",
+      "descripcion": "Supervisión general de operativos y servicios municipales descentralizados.",
+      "ponderacion": 50,
+      "periodo_id": 1,
+      "evidencia": null,
+      "deleted_at": null
+    }
+  ],
+  "resetCodes": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "code_hash": "$2a$08$T5c1ufHI4vk014pT0lGY3.i7k/bMHhxC0xm7LIH4aoeFQuTdSpbG.",
+      "raw_code": "992516",
+      "created_at": "2026-10-08T23:19:26.272Z",
+      "expires_at": "2026-10-08T23:21:26.272Z",
+      "is_used": true,
+      "failed_attempts": 0
+    }
+  ],
+  "nextMetaId": 6,
+  "nextResetCodeId": 2,
+  "nextDelegacionId": 5,
+  "nextPeriodoId": 3,
+  "nextServicioId": 5,
+  "nextUserId": 5
+}

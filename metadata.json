@@ -1,0 +1,6 @@
+{
+  "name": "SGR La Serena",
+  "description": "Sistema de Gestión de Rendimiento (SGR) para la Municipalidad de La Serena. Gestión de metas, delegaciones, períodos y ponderaciones.",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"],
+  "permissions": []
+}

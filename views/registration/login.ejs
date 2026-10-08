@@ -15,36 +15,44 @@
         </div>
         <div class="card-body p-4">
             
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} p-2 mb-3 small text-center">
-                        {{ message }}
+            <% if (messages && messages.length > 0) { %>
+                <% messages.forEach(message => { %>
+                    <div class="alert alert-<%= message.tags === 'error' ? 'danger' : message.tags %> p-2 mb-3 small text-center">
+                        <%= message.text %>
                     </div>
-                {% endfor %}
-            {% endif %}
+                <% }) %>
+            <% } %>
 
-            {% if form.errors %}
+            <% if (form && form.errors) { %>
                 <div class="alert alert-danger text-center p-2 mb-3 small">
                     Usuario o contraseña incorrectos. Intente nuevamente.
                 </div>
-            {% endif %}
+            <% } %>
 
-            <form method="post">
-                {% csrf_token %}
+            <!-- Demo helper card -->
+            <div class="alert alert-info p-2 mb-3 small">
+                <strong>Cuentas de prueba:</strong><br>
+                &bull; <code>admin</code> / <code>admin1234</code> (Administrador)<br>
+                &bull; <code>funcionario1</code> / <code>user1234</code> (Funcionario Centro)<br>
+                &bull; <code>delegado_companias</code> / <code>laserena2026</code> (Delegado)
+            </div>
+
+            <form method="post" action="/login">
+                <input type="hidden" name="next" value="<%= next %>">
                 <div class="mb-3">
                     <label for="id_username" class="form-label fw-semibold">Usuario</label>
-                    <input type="text" name="username" class="form-control" id="id_username" required autofocus>
+                    <input type="text" name="username" class="form-control" id="id_username" placeholder="admin" required autofocus>
                 </div>
                 <div class="mb-3">
                     <label for="id_password" class="form-label fw-semibold">Contraseña</label>
-                    <input type="password" name="password" class="form-control" id="id_password" required>
+                    <input type="password" name="password" class="form-control" id="id_password" placeholder="admin1234" required>
                 </div>
                 <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-2">Ingresar</button>
             </form>
 
             <div class="text-center mt-3 d-flex justify-content-between">
-                <a href="{% url 'password_reset_request' %}" class="text-primary small text-decoration-none">¿Olvidaste tu contraseña?</a>
-                <a href="{% url 'wireframe_front' %}" class="text-muted small text-decoration-none">← Sitio público</a>
+                <a href="/password-reset/" class="text-primary small text-decoration-none">¿Olvidaste tu contraseña?</a>
+                <a href="/wireframe-front" class="text-muted small text-decoration-none">← Sitio público</a>
             </div>
 
         </div>
