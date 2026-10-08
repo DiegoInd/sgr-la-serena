@@ -5,88 +5,199 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGR La Serena - Registro de Metas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="bg-light">
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="#">SGR La Serena - Sistema de Gestión</a>
-            <span class="navbar-text text-white">
-                Usuario: <strong>Funcionario</strong> | Perfil: <strong>Mantenedores</strong>
+            <a class="navbar-brand fw-bold" href="{% url 'wireframe_front' %}">SGR La Serena - Sistema de Gestión</a>
+            <span class="navbar-text text-white d-flex align-items-center">
+                {% if user.is_authenticated %}
+                    <span class="me-3">
+                        Usuario: <strong>{{ user.username }}</strong> | Delegación: <strong>{{ user.perfilusuario.delegacion.nombre|default:"Global" }}</strong>
+                    </span>
+                    <form action="{% url 'logout' %}" method="post" class="d-inline m-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-light">Cerrar Sesión</button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-sm btn-light text-primary fw-bold">Ingresar</a>
+                {% endif %}
             </span>
         </div>
     </nav>
 
     <div class="container mb-5">
-        <div class="row g-4">
-            <div class="col-md-5">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white fw-bold text-primary">
-                        Registrar Nueva Meta (RF-01 / HU-02)
-                    </div>
-                    <div class="card-body">
-                        <form>
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Cargo o Usuario Responsable</label>
-                                <input type="text" class="form-control" placeholder="Ej: Analista de Atención" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Período Evaluativo</label>
-                                <select class="form-select">
-                                    <option selected>Seleccione Período...</option>
-                                    <option>2026 - Trimestre 1 (01/01/2026 - 31/03/2026)</option>
-                                    <option>2026 - Trimestre 2 (01/04/2026 - 30/06/2026)</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Ponderación (%)</label>
-                                <input type="number" class="form-control" min="1" max="100" placeholder="Ej: 25">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold">Descripción de la Meta</label>
-                                <textarea class="form-control" rows="3" placeholder="Describa el objetivo asignado..."></textarea>
-                            </div>
-                            <button type="button" class="btn btn-primary w-100 fw-bold">Guardar Meta</button>
-                        </form>
-                    </div>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="text-primary fw-bold mb-0">Metas y Ponderaciones Asignadas</h4>
+            {% if perms.mantenedores.add_meta %}
+                <a href="{% url 'meta_create' %}" class="btn btn-primary fw-bold">+ Registrar Nueva Meta</a>
+            {% endif %}
+        </div>
+
+        <!-- Tabla con Paginador y Sesión (Clase 6) -->
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Cargo / Usuario</th>
+                            <th>Período</th>
+                            <th>Ponderación</th>
+                            <th>Evidencia</th>
+                            <th class="text-end pe-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for meta in page_obj %}
+                        <tr>
+                            <td><strong>{{ meta.cargo_o_usuario }}</strong></td>
+                            <td>{{ meta.periodo }}</td>
+                            <td><span class="badge bg-primary fs-6">{{ meta.ponderacion }}%</span></td>
+                            <td>
+                                {% if meta.evidencia %}
+                                    <a href="{{ meta.evidencia.url }}" target="_blank" class="btn btn-sm btn-outline-info">Ver Archivo</a>
+                                {% else %}
+                                    <span class="text-muted small">Sin evidencia</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                {% if perms.mantenedores.change_meta %}
+                                    <a href="{% url 'meta_update' meta.pk %}" class="btn btn-sm btn-outline-primary me-1">Editar</a>
+                                {% endif %}
+                                {% if perms.mantenedores.delete_meta %}
+                                    <form id="delete-form-{{ meta.pk }}" action="{% url 'meta_delete' meta.pk %}" method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-id="{{ meta.pk }}">Archivar</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">No existen metas registradas para esta delegación.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
 
-            <div class="col-md-7">
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white fw-bold text-primary">
-                        Metas y Ponderaciones Asignadas
-                    </div>
-                    <div class="card-body p-0">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Cargo / Usuario</th>
-                                    <th>Período</th>
-                                    <th>Ponderación</th>
-                                    <th>Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Atención al Vecino</td>
-                                    <td>2026 - T1</td>
-                                    <td><span class="badge bg-success">30%</span></td>
-                                    <td><button class="btn btn-sm btn-outline-secondary">Editar</button></td>
-                                </tr>
-                                <tr>
-                                    <td>Coordinador de Terreno</td>
-                                    <td>2026 - T1</td>
-                                    <td><span class="badge bg-primary">40%</span></td>
-                                    <td><button class="btn btn-sm btn-outline-secondary">Editar</button></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- Footer de la Tabla: Selector de Paginación y Botones Nivel Clase 6 -->
+            {% if page_obj.paginator.count > 0 %}
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
+                <div class="d-flex align-items-center">
+                    <span class="me-2 text-muted small">Registros por página:</span>
+                    <select class="form-select form-select-sm w-auto" onchange="location.href='?page_size='+this.value">
+                        <option value="5" {% if page_size == 5 %}selected{% endif %}>5</option>
+                        <option value="15" {% if page_size == 15 %}selected{% endif %}>15</option>
+                        <option value="30" {% if page_size == 30 %}selected{% endif %}>30</option>
+                    </select>
                 </div>
+
+                {% if page_obj.paginator.num_pages > 1 %}
+                <nav aria-label="Navegación de metas">
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+                        {% endif %}
+
+                        <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Siguiente</a></li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
             </div>
+            {% endif %}
         </div>
     </div>
 
+    <!-- Modal Reutilizable -->
+    {% if form %}
+    <div class="modal fade" id="metaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold">{% if object %}Editar Meta{% else %}Registrar Nueva Meta{% endif %}</h5>
+                        <a href="{% url 'wireframe_front' %}" class="btn-close btn-close-white"></a>
+                    </div>
+                    <div class="modal-body">
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% for field in form %}
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}:</label>
+                                {{ field }}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small mt-1">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="modal-footer">
+                        <a href="{% url 'wireframe_front' %}" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-primary fw-bold">Guardar Meta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        {% if open_modal %}
+            document.addEventListener("DOMContentLoaded", function () {
+                const modalElement = document.getElementById("metaModal");
+                if (modalElement) {
+                    const modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                }
+            });
+        {% endif %}
+
+        document.querySelectorAll(".js-delete-btn").forEach(button => {
+            button.addEventListener("click", function () {
+                const metaId = this.getAttribute("data-id");
+                Swal.fire({
+                    title: "¿Archivar esta meta?",
+                    text: "El registro no se eliminará físicamente de la base de datos.",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "Sí, archivar",
+                    cancelButtonText: "Cancelar",
+                    confirmButtonColor: "#dc3545"
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById(`delete-form-${metaId}`).submit();
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

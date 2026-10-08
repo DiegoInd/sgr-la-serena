@@ -1,24 +1,34 @@
-"""
-URL configuration for config project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
-from django.urls import path
-from mantenedores.views import vista_wireframe
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+from django.shortcuts import redirect
+from mantenedores.views import (
+    vista_wireframe, 
+    MetaCreateView, 
+    MetaUpdateView, 
+    MetaDeleteView,
+    PasswordResetRequestView,
+    PasswordResetVerifyView,
+    PasswordResetConfirmView
+)
 
 urlpatterns = [
+    path('', lambda request: redirect('wireframe_front')),
     path('admin/', admin.site.urls),
+    path('accounts/', include('django.contrib.auth.urls')),
+
+    # Rutas del Desafío de Recuperación por Código Temporal (Clase 6)
+    path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('password-reset/verify/', PasswordResetVerifyView.as_view(), name='password_reset_verify'),
+    path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+
+    # Rutas CRUD SGR
     path('wireframe-front/', vista_wireframe, name='wireframe_front'),
+    path('wireframe-front/meta/nueva/', MetaCreateView.as_view(), name='meta_create'),
+    path('wireframe-front/meta/<int:pk>/editar/', MetaUpdateView.as_view(), name='meta_update'),
+    path('wireframe-front/meta/<int:pk>/eliminar/', MetaDeleteView.as_view(), name='meta_delete'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGR La Serena - Iniciar Sesión</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center vh-100">
+
+    <div class="card shadow-sm border-0" style="width: 100%; max-width: 400px;">
+        <div class="card-header bg-primary text-white text-center py-3">
+            <h5 class="mb-0 fw-bold">SGR La Serena</h5>
+            <small>Ingreso al Sistema de Gestión</small>
+        </div>
+        <div class="card-body p-4">
+            
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} p-2 mb-3 small text-center">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% if form.errors %}
+                <div class="alert alert-danger text-center p-2 mb-3 small">
+                    Usuario o contraseña incorrectos. Intente nuevamente.
+                </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="id_username" class="form-label fw-semibold">Usuario</label>
+                    <input type="text" name="username" class="form-control" id="id_username" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label for="id_password" class="form-label fw-semibold">Contraseña</label>
+                    <input type="password" name="password" class="form-control" id="id_password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-2">Ingresar</button>
+            </form>
+
+            <div class="text-center mt-3 d-flex justify-content-between">
+                <a href="{% url 'password_reset_request' %}" class="text-primary small text-decoration-none">¿Olvidaste tu contraseña?</a>
+                <a href="{% url 'wireframe_front' %}" class="text-muted small text-decoration-none">← Sitio público</a>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>
