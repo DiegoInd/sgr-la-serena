@@ -11,6 +11,7 @@ Proyecto desarrollado bajo una arquitectura web modular en Django, aplicando la 
 ### 1. Clonar el repositorio
 
 git clone https://github.com/DiegoInd/sgr-la-serena
+
 cd sgr-la-serena
 
 ### 2. Crear y activar el entorno virtual
@@ -20,9 +21,8 @@ En Windows (PowerShell):
 PowerShell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-En Linux / macOS / Git Bash:
 
-Bash
+En Linux / macOS / Git Bash:
 python3 -m venv venv
 source venv/bin/activate
 
