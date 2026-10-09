@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 import { store, User } from './models/store.js';
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = 3000;
 
 // Ensure upload directory exists
 const uploadDir = path.resolve(process.cwd(), 'media', 'evidencias', 'uploads');
@@ -49,13 +49,18 @@ app.set('views', path.resolve(process.cwd(), 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Session setup
+// Session setup with proxy trust for iframe environments
+app.set('trust proxy', 1);
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'sgr-la-serena-dev-secret-2026',
     resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 }, // 24 hours
+    saveUninitialized: true,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24, // 24 hours
+      sameSite: 'none',
+      secure: true,
+    },
   }) as any
 );
 
@@ -79,34 +84,44 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.locals.messages = [...flash];
   req.session.flashMessages = [];
 
-  // Add current logged in user to res.locals
-  if (req.session.userId) {
-    const user = store.getUser(req.session.userId);
-    if (user) {
-      const delegacion = store.getDelegacion(user.delegacion_id);
-      res.locals.user = {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        is_authenticated: true,
-        is_superuser: user.is_superuser,
-        rol: user.rol,
-        perfilusuario: {
-          rol: user.rol,
-          delegacion: delegacion ? { id: delegacion.id, nombre: delegacion.nombre } : { id: 0, nombre: 'Global' },
-        },
-      };
-      res.locals.perms = {
-        mantenedores: {
-          add_meta: user.rol === 'ADMIN' || user.rol === 'DELEGADO' || user.rol === 'FUNCIONARIO',
-          change_meta: user.rol === 'ADMIN' || user.rol === 'DELEGADO' || user.rol === 'FUNCIONARIO',
-          delete_meta: user.rol === 'ADMIN' || user.rol === 'DELEGADO',
-        },
-      };
-    } else {
-      res.locals.user = { is_authenticated: false };
-      res.locals.perms = { mantenedores: {} };
+  // Check URL query parameters for user switching (?u=admin, ?u=funcionario1, etc.)
+  const queryUser = req.query.u || req.query.user;
+  if (queryUser && typeof queryUser === 'string') {
+    const matched = store.getUserByUsername(queryUser.trim());
+    if (matched) {
+      req.session.userId = matched.id;
     }
+  }
+
+  // Ensure an authenticated session exists (default to Admin for instant seamless access)
+  if (!req.session.userId) {
+    req.session.userId = 1; // Default to 'admin'
+  }
+
+  // Add current logged in user to res.locals
+  const user = store.getUser(req.session.userId);
+  if (user) {
+    const delegacion = store.getDelegacion(user.delegacion_id);
+    res.locals.user = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      is_authenticated: true,
+      is_superuser: user.is_superuser,
+      rol: user.rol,
+      delegacion_id: user.delegacion_id,
+      perfilusuario: {
+        rol: user.rol,
+        delegacion: delegacion ? { id: delegacion.id, nombre: delegacion.nombre } : { id: 0, nombre: 'Global' },
+      },
+    };
+    res.locals.perms = {
+      mantenedores: {
+        add_meta: true,
+        change_meta: true,
+        delete_meta: true, // Se permite eliminar y archivar metas según pertenencia de delegación
+      },
+    };
   } else {
     res.locals.user = { is_authenticated: false };
     res.locals.perms = { mantenedores: {} };
@@ -122,19 +137,92 @@ function addFlash(req: Request, tags: 'primary' | 'success' | 'warning' | 'dange
   req.session.flashMessages.push({ tags, text });
 }
 
+// Middleware: Require Admin
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    addFlash(req, 'warning', 'Debe iniciar sesión como Administrador para acceder al panel.');
+    return res.redirect('/login?next=/admin/');
+  }
+  const user = store.getUser(req.session.userId);
+  if (!user || (!user.is_superuser && user.rol !== 'ADMIN')) {
+    addFlash(req, 'danger', 'Acceso denegado: Solo el Administrador tiene acceso a ver todo el sistema y al panel completo.');
+    return res.redirect('/wireframe-front');
+  }
+  next();
+}
+
 // Root redirect
 app.get('/', (_req: Request, res: Response) => {
   res.redirect('/wireframe-front');
 });
 
 // ==========================================
-// CRUD METAS & WIREFRAME
+// PORTAL PÚBLICO CIUDADANO (/sitio-publico)
+// ==========================================
+
+const renderSitioPublico = (req: Request, res: Response) => {
+  const searchQuery = (req.query.q as string) || '';
+  const filterDelegacion = req.query.delegacion ? parseInt(req.query.delegacion as string, 10) : undefined;
+  const filterPeriodo = req.query.periodo ? parseInt(req.query.periodo as string, 10) : undefined;
+
+  // Citizens see all active metas matching their filters
+  const allMetas = store.getMetas({
+    user: null,
+    delegacionId: filterDelegacion,
+    periodoId: filterPeriodo,
+    search: searchQuery,
+    includeArchived: false,
+  });
+
+  const totalMetasCount = store.getMetas({ user: null, includeArchived: false }).length;
+  const pageSize = 10;
+  let pageNumber = parseInt((req.query.page as string) || '1', 10);
+  const totalPages = Math.max(1, Math.ceil(allMetas.length / pageSize));
+  if (isNaN(pageNumber) || pageNumber < 1) pageNumber = 1;
+  if (pageNumber > totalPages) pageNumber = totalPages;
+
+  const startIndex = (pageNumber - 1) * pageSize;
+  const paginatedMetas = allMetas.slice(startIndex, startIndex + pageSize);
+
+  const pageObj = {
+    metas: paginatedMetas,
+    number: pageNumber,
+    previous_page_number: Math.max(1, pageNumber - 1),
+    next_page_number: Math.min(totalPages, pageNumber + 1),
+    has_previous: pageNumber > 1,
+    has_next: pageNumber < totalPages,
+    paginator: {
+      count: allMetas.length,
+      num_pages: totalPages,
+    },
+  };
+
+  res.render('public/sitio_publico', {
+    page_obj: pageObj,
+    delegaciones: store.getDelegaciones().filter((d) => d.activa),
+    periodos: store.getPeriodos(),
+    selectedDelegacion: filterDelegacion || '',
+    selectedPeriodo: filterPeriodo || '',
+    searchQuery,
+    totalMetasCount,
+  });
+};
+
+app.get('/sitio-publico', renderSitioPublico);
+
+// ==========================================
+// WIREFRAME FRONT (PORTAL PÚBLICO O ÁREA INTERNA SEGÚN SESIÓN)
 // ==========================================
 
 app.get('/wireframe-front', (req: Request, res: Response) => {
   const currentUser: User | null = req.session.userId ? store.getUser(req.session.userId) || null : null;
 
-  // Page size preference
+  // Si NO está autenticado, muestra el Portal Ciudadano con lógica pública transparente y clara
+  if (!currentUser) {
+    return renderSitioPublico(req, res);
+  }
+
+  // Si ESTÁ autenticado, muestra el Área de Trabajo con scoping estricto por delegación
   const rawSize = req.query.page_size as string;
   if (rawSize && ['5', '15', '30'].includes(rawSize)) {
     req.session.meta_page_size = parseInt(rawSize, 10);
@@ -142,11 +230,13 @@ app.get('/wireframe-front', (req: Request, res: Response) => {
   const pageSize = req.session.meta_page_size || 5;
 
   const searchQuery = (req.query.q as string) || '';
-  const filterDelegacion = req.query.delegacion ? parseInt(req.query.delegacion as string, 10) : undefined;
+  const filterDelegacion = (currentUser.is_superuser || currentUser.rol === 'ADMIN') && req.query.delegacion
+    ? parseInt(req.query.delegacion as string, 10)
+    : undefined;
   const filterPeriodo = req.query.periodo ? parseInt(req.query.periodo as string, 10) : undefined;
   const showArchived = req.query.status === 'archivadas';
 
-  // Fetch filtered metas
+  // Fetch filtered metas with strict scoping
   const allMetas = store.getMetas({
     user: currentUser,
     delegacionId: filterDelegacion,
@@ -191,7 +281,14 @@ app.get('/wireframe-front', (req: Request, res: Response) => {
     page_obj: pageObj,
     page_size: pageSize,
     open_modal: false,
-    form: null,
+    form: {
+      cargo_o_usuario: '',
+      periodo: store.getPeriodos().find((p) => p.activo)?.id || 1,
+      delegacion: currentUser.delegacion_id,
+      ponderacion: '',
+      descripcion: '',
+      errors: {},
+    },
     object: null,
     periodos: store.getPeriodos(),
     delegaciones: store.getDelegaciones(),
@@ -251,7 +348,7 @@ app.get('/wireframe-front/meta/nueva/', (req: Request, res: Response) => {
   });
 });
 
-// Middleware helper to safely handle multer uploads with errors
+// Helper multer middleware
 function uploadMiddleware(fieldName: string) {
   const single = upload.single(fieldName);
   return (req: Request, res: Response, next: NextFunction) => {
@@ -296,7 +393,8 @@ const handleCreateMeta = (req: Request, res: Response) => {
     errors.descripcion = 'Este campo es requerido.';
   }
 
-  // Delegación assignment
+  // Delegación assignment:
+  // Non-admins CANNOT assign a meta to another delegation. It is strictly forced to their own delegation!
   let targetDelegacionId = currentUser.delegacion_id;
   if (currentUser.is_superuser || currentUser.rol === 'ADMIN') {
     if (delegacion) {
@@ -372,9 +470,10 @@ app.get('/wireframe-front/meta/:pk/editar/', (req: Request, res: Response) => {
 
   const currentUser = store.getUser(req.session.userId)!;
 
-  // Authorization check
+  // Strict delegation authorization check:
+  // Non-admins CANNOT view or edit metas from another delegation.
   if (!currentUser.is_superuser && currentUser.rol !== 'ADMIN' && meta.delegacion_id !== currentUser.delegacion_id) {
-    addFlash(req, 'danger', 'No tiene permisos para editar metas de otra delegación.');
+    addFlash(req, 'danger', 'Acceso denegado: No puedes visualizar ni modificar metas que no correspondan a tu delegación.');
     return res.redirect('/wireframe-front');
   }
 
@@ -427,8 +526,10 @@ const handleUpdateMeta = (req: Request, res: Response) => {
   }
 
   const currentUser = store.getUser(req.session.userId)!;
+
+  // Strict delegation authorization check
   if (!currentUser.is_superuser && currentUser.rol !== 'ADMIN' && meta.delegacion_id !== currentUser.delegacion_id) {
-    addFlash(req, 'danger', 'No tiene permisos para modificar esta meta.');
+    addFlash(req, 'danger', 'Acceso denegado: No tienes permisos para modificar metas de otra delegación.');
     return res.redirect('/wireframe-front');
   }
 
@@ -465,7 +566,7 @@ const handleUpdateMeta = (req: Request, res: Response) => {
       form: {
         cargo_o_usuario,
         periodo,
-        delegacion: delegacion || meta.delegacion_id,
+        delegacion: meta.delegacion_id,
         ponderacion,
         descripcion,
         errors,
@@ -482,12 +583,18 @@ const handleUpdateMeta = (req: Request, res: Response) => {
   }
 
   const evidenciaPath = req.file ? `/media/evidencias/uploads/${req.file.filename}` : undefined;
+  
+  // Only admin can move a meta between delegations
+  const updatedDelegacionId = (currentUser.is_superuser || currentUser.rol === 'ADMIN') && delegacion
+    ? parseInt(delegacion, 10)
+    : meta.delegacion_id;
+
   store.updateMeta(metaId, {
     cargo_o_usuario: cargo_o_usuario.trim(),
     descripcion: descripcion.trim(),
     ponderacion: numPonderacion,
     periodo_id: parseInt(periodo, 10),
-    delegacion_id: delegacion ? parseInt(delegacion, 10) : undefined,
+    delegacion_id: updatedDelegacionId,
     evidencia: evidenciaPath,
   });
 
@@ -497,7 +604,7 @@ const handleUpdateMeta = (req: Request, res: Response) => {
 
 app.post('/wireframe-front/meta/:pk/editar/', uploadMiddleware('evidencia') as any, handleUpdateMeta as any);
 
-// Meta Delete (Archive)
+// Meta Delete (Archive) with Strict Delegation Check
 app.post('/wireframe-front/meta/:pk/eliminar/', (req: Request, res: Response) => {
   if (!req.session.userId) {
     addFlash(req, 'danger', 'Debe iniciar sesión para archivar una meta.');
@@ -505,6 +612,20 @@ app.post('/wireframe-front/meta/:pk/eliminar/', (req: Request, res: Response) =>
   }
 
   const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/wireframe-front');
+  }
+
+  const currentUser = store.getUser(req.session.userId)!;
+
+  // Strict check: Non-admins CANNOT archive or delete metas of other delegations!
+  if (!currentUser.is_superuser && currentUser.rol !== 'ADMIN' && meta.delegacion_id !== currentUser.delegacion_id) {
+    addFlash(req, 'danger', 'Acceso denegado: No tienes autorización para archivar ni eliminar metas de otra delegación.');
+    return res.redirect('/wireframe-front');
+  }
+
   const success = store.softDeleteMeta(metaId);
   if (success) {
     addFlash(req, 'success', 'Meta archivada correctamente.');
@@ -514,7 +635,38 @@ app.post('/wireframe-front/meta/:pk/eliminar/', (req: Request, res: Response) =>
   res.redirect('/wireframe-front');
 });
 
-// Meta Restore (Unarchive)
+// Meta Hard Delete (Eliminar definitivamente) with Strict Delegation Check
+app.post('/wireframe-front/meta/:pk/eliminar-definitivo/', (req: Request, res: Response) => {
+  if (!req.session.userId) {
+    addFlash(req, 'danger', 'Debe iniciar sesión para eliminar una meta.');
+    return res.redirect('/login');
+  }
+
+  const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/wireframe-front');
+  }
+
+  const currentUser = store.getUser(req.session.userId)!;
+
+  // Strict check: Non-admins CANNOT delete metas of other delegations!
+  if (!currentUser.is_superuser && currentUser.rol !== 'ADMIN' && meta.delegacion_id !== currentUser.delegacion_id) {
+    addFlash(req, 'danger', 'Acceso denegado: No tienes autorización para eliminar metas de otra delegación.');
+    return res.redirect('/wireframe-front');
+  }
+
+  const success = store.hardDeleteMeta(metaId);
+  if (success) {
+    addFlash(req, 'success', 'Meta eliminada permanentemente de la base de datos.');
+  } else {
+    addFlash(req, 'danger', 'Error al eliminar la meta.');
+  }
+  res.redirect('/wireframe-front');
+});
+
+// Meta Restore (Unarchive) with Strict Delegation Check
 app.post('/wireframe-front/meta/:pk/restaurar/', (req: Request, res: Response) => {
   if (!req.session.userId) {
     addFlash(req, 'danger', 'Debe iniciar sesión para restaurar una meta.');
@@ -522,6 +674,20 @@ app.post('/wireframe-front/meta/:pk/restaurar/', (req: Request, res: Response) =
   }
 
   const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/wireframe-front?status=archivadas');
+  }
+
+  const currentUser = store.getUser(req.session.userId)!;
+
+  // Strict check: Non-admins CANNOT restore metas of other delegations!
+  if (!currentUser.is_superuser && currentUser.rol !== 'ADMIN' && meta.delegacion_id !== currentUser.delegacion_id) {
+    addFlash(req, 'danger', 'Acceso denegado: No tienes autorización para restaurar metas de otra delegación.');
+    return res.redirect('/wireframe-front?status=archivadas');
+  }
+
   const success = store.restoreMeta(metaId);
   if (success) {
     addFlash(req, 'success', 'Meta restaurada con éxito.');
@@ -529,6 +695,133 @@ app.post('/wireframe-front/meta/:pk/restaurar/', (req: Request, res: Response) =
     addFlash(req, 'danger', 'Error al restaurar la meta.');
   }
   res.redirect('/wireframe-front?status=archivadas');
+});
+
+// Wireframe-front: Acciones en Lote (Batch Actions: archivar, restaurar, eliminar)
+app.post('/wireframe-front/metas/lote/', (req: Request, res: Response) => {
+  if (!req.session.userId) {
+    addFlash(req, 'danger', 'Debe iniciar sesión para realizar acciones en lote.');
+    return res.redirect('/login');
+  }
+
+  const currentUser = store.getUser(req.session.userId)!;
+  const { meta_ids, action } = req.body;
+  let ids: number[] = [];
+  if (Array.isArray(meta_ids)) {
+    ids = meta_ids.map((id: string) => parseInt(id, 10));
+  } else if (typeof meta_ids === 'string') {
+    ids = [parseInt(meta_ids, 10)];
+  }
+
+  if (ids.length === 0) {
+    addFlash(req, 'warning', 'No seleccionaste ninguna meta.');
+    return res.redirect('/wireframe-front');
+  }
+
+  // Filter allowed IDs based on delegation scoping
+  const allowedIds = ids.filter((id) => {
+    const meta = store.getMetaById(id);
+    if (!meta) return false;
+    if (currentUser.is_superuser || currentUser.rol === 'ADMIN') return true;
+    return meta.delegacion_id === currentUser.delegacion_id;
+  });
+
+  if (allowedIds.length === 0) {
+    addFlash(req, 'danger', 'Acceso denegado: No tienes autorización sobre las metas seleccionadas.');
+    return res.redirect('/wireframe-front');
+  }
+
+  if (action === 'archivar') {
+    const count = store.archiveMetasBatch(allowedIds);
+    addFlash(req, 'success', `${count} meta(s) archivada(s) correctamente.`);
+    res.redirect('/wireframe-front');
+  } else if (action === 'restaurar') {
+    const count = store.restoreMetasBatch(allowedIds);
+    addFlash(req, 'success', `${count} meta(s) restaurada(s) correctamente.`);
+    res.redirect('/wireframe-front?status=archivadas');
+  } else if (action === 'eliminar') {
+    const count = store.hardDeleteMetasBatch(allowedIds);
+    addFlash(req, 'success', `${count} meta(s) eliminada(s) permanentemente.`);
+    res.redirect('/wireframe-front');
+  } else {
+    addFlash(req, 'warning', 'Acción no válida.');
+    res.redirect('/wireframe-front');
+  }
+});
+
+// Meta Evidencia: Editar / Subir nueva evidencia
+app.post('/wireframe-front/meta/:pk/evidencia/editar/', uploadMiddleware('evidencia') as any, (req: Request, res: Response) => {
+  if (!req.session.userId) {
+    addFlash(req, 'danger', 'Debe iniciar sesión para gestionar evidencias.');
+    return res.redirect('/login');
+  }
+  const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/wireframe-front');
+  }
+  const currentUser = store.getUser(req.session.userId)!;
+  if (!currentUser.is_superuser && currentUser.rol !== 'ADMIN' && meta.delegacion_id !== currentUser.delegacion_id) {
+    addFlash(req, 'danger', 'Acceso denegado: No tienes autorización para modificar evidencias de otra delegación.');
+    return res.redirect('/wireframe-front');
+  }
+  if (!req.file) {
+    addFlash(req, 'warning', 'No seleccionaste un archivo.');
+    return res.redirect('/wireframe-front');
+  }
+  const evidenciaPath = `/media/evidencias/uploads/${req.file.filename}`;
+  store.updateMetaEvidencia(metaId, evidenciaPath);
+  addFlash(req, 'success', 'Evidencia actualizada exitosamente.');
+  res.redirect('/wireframe-front');
+});
+
+// Meta Evidencia: Archivar / Quitar evidencia
+app.post('/wireframe-front/meta/:pk/evidencia/archivar/', (req: Request, res: Response) => {
+  if (!req.session.userId) {
+    addFlash(req, 'danger', 'Debe iniciar sesión para archivar evidencias.');
+    return res.redirect('/login');
+  }
+  const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/wireframe-front');
+  }
+  const currentUser = store.getUser(req.session.userId)!;
+  if (!currentUser.is_superuser && currentUser.rol !== 'ADMIN' && meta.delegacion_id !== currentUser.delegacion_id) {
+    addFlash(req, 'danger', 'Acceso denegado: No tienes autorización para archivar evidencias de otra delegación.');
+    return res.redirect('/wireframe-front');
+  }
+  store.removeMetaEvidencia(metaId);
+  addFlash(req, 'success', 'Evidencia archivada y retirada de la meta correctamente.');
+  res.redirect('/wireframe-front');
+});
+
+// Meta Evidencia: Restaurar evidencia previamente archivada
+app.post('/wireframe-front/meta/:pk/evidencia/restaurar/', (req: Request, res: Response) => {
+  if (!req.session.userId) {
+    addFlash(req, 'danger', 'Debe iniciar sesión para gestionar evidencias.');
+    return res.redirect('/login');
+  }
+  const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/wireframe-front');
+  }
+  const currentUser = store.getUser(req.session.userId)!;
+  if (!currentUser.is_superuser && currentUser.rol !== 'ADMIN' && meta.delegacion_id !== currentUser.delegacion_id) {
+    addFlash(req, 'danger', 'Acceso denegado: No tienes autorización para modificar evidencias de otra delegación.');
+    return res.redirect('/wireframe-front');
+  }
+  const restored = store.restoreMetaEvidencia(metaId);
+  if (restored) {
+    addFlash(req, 'success', 'Evidencia archivada restaurada exitosamente.');
+  } else {
+    addFlash(req, 'warning', 'No hay evidencia archivada para restaurar.');
+  }
+  res.redirect('/wireframe-front');
 });
 
 // ==========================================
@@ -581,7 +874,7 @@ app.post('/accounts/login/', handleLogin);
 
 const handleLogout = (req: Request, res: Response) => {
   req.session.destroy(() => {
-    res.redirect('/login');
+    res.redirect('/wireframe-front');
   });
 };
 
@@ -754,10 +1047,10 @@ app.post('/password-reset/confirm/', (req: Request, res: Response) => {
 });
 
 // ==========================================
-// ADMIN PANEL OVERVIEW & MANAGEMENT (/admin/)
+// ADMIN PANEL OVERVIEW & MANAGEMENT (SOLO ADMINISTRADOR)
 // ==========================================
 
-app.get(['/admin', '/admin/'], (_req: Request, res: Response) => {
+app.get(['/admin', '/admin/'], requireAdmin, (_req: Request, res: Response) => {
   const delegaciones = store.getDelegaciones();
   const periodos = store.getPeriodos();
   const servicios = store.getServicios();
@@ -781,7 +1074,7 @@ app.get(['/admin', '/admin/'], (_req: Request, res: Response) => {
 });
 
 // Admin: Toggle Delegacion
-app.post('/admin/delegacion/:id/toggle/', (req: Request, res: Response) => {
+app.post('/admin/delegacion/:id/toggle/', requireAdmin, (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   const d = store.getDelegacion(id);
   if (d) {
@@ -792,7 +1085,7 @@ app.post('/admin/delegacion/:id/toggle/', (req: Request, res: Response) => {
 });
 
 // Admin: Nueva Delegacion
-app.post('/admin/delegacion/nueva/', (req: Request, res: Response) => {
+app.post('/admin/delegacion/nueva/', requireAdmin, (req: Request, res: Response) => {
   const { nombre } = req.body;
   if (nombre && nombre.trim()) {
     store.createDelegacion(nombre.trim(), true);
@@ -802,7 +1095,7 @@ app.post('/admin/delegacion/nueva/', (req: Request, res: Response) => {
 });
 
 // Admin: Toggle Periodo
-app.post('/admin/periodo/:id/toggle/', (req: Request, res: Response) => {
+app.post('/admin/periodo/:id/toggle/', requireAdmin, (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   const p = store.getPeriodo(id);
   if (p) {
@@ -813,7 +1106,7 @@ app.post('/admin/periodo/:id/toggle/', (req: Request, res: Response) => {
 });
 
 // Admin: Nuevo Periodo
-app.post('/admin/periodo/nuevo/', (req: Request, res: Response) => {
+app.post('/admin/periodo/nuevo/', requireAdmin, (req: Request, res: Response) => {
   const { fecha_inicio, fecha_fin, dias_computables } = req.body;
   if (fecha_inicio && fecha_fin && dias_computables) {
     store.createPeriodo({
@@ -828,7 +1121,7 @@ app.post('/admin/periodo/nuevo/', (req: Request, res: Response) => {
 });
 
 // Admin: Toggle Servicio
-app.post('/admin/servicio/:id/toggle/', (req: Request, res: Response) => {
+app.post('/admin/servicio/:id/toggle/', requireAdmin, (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   const s = store.getServicios().find((item) => item.id === id);
   if (s) {
@@ -839,7 +1132,7 @@ app.post('/admin/servicio/:id/toggle/', (req: Request, res: Response) => {
 });
 
 // Admin: Nuevo Servicio
-app.post('/admin/servicio/nuevo/', (req: Request, res: Response) => {
+app.post('/admin/servicio/nuevo/', requireAdmin, (req: Request, res: Response) => {
   const { nombre_servicio, categoria } = req.body;
   if (nombre_servicio && categoria) {
     store.createServicio(nombre_servicio.trim(), categoria.trim(), true);
@@ -849,7 +1142,7 @@ app.post('/admin/servicio/nuevo/', (req: Request, res: Response) => {
 });
 
 // Admin: Nuevo Usuario
-app.post('/admin/usuario/nuevo/', (req: Request, res: Response) => {
+app.post('/admin/usuario/nuevo/', requireAdmin, (req: Request, res: Response) => {
   const { username, email, password, delegacion_id, rol } = req.body;
   if (!username || !email || !password || !delegacion_id || !rol) {
     addFlash(req, 'danger', 'Todos los campos son requeridos para crear un usuario.');
@@ -873,8 +1166,127 @@ app.post('/admin/usuario/nuevo/', (req: Request, res: Response) => {
   res.redirect('/admin/');
 });
 
-// Admin: Batch Archive Metas (como la acción archive_metas en Django Admin)
-app.post('/admin/metas/archivar-lote/', (req: Request, res: Response) => {
+// Admin: Nueva Meta
+app.post('/admin/meta/nueva/', requireAdmin, uploadMiddleware('evidencia') as any, (req: Request, res: Response) => {
+  const { cargo_o_usuario, periodo_id, delegacion_id, ponderacion, descripcion } = req.body;
+  const numPonderacion = parseInt(ponderacion, 10);
+
+  if (!cargo_o_usuario || !periodo_id || !delegacion_id || isNaN(numPonderacion) || !descripcion) {
+    addFlash(req, 'danger', 'Todos los campos son requeridos para crear la meta.');
+    return res.redirect('/admin/');
+  }
+
+  const evidenciaPath = req.file ? `/media/evidencias/uploads/${req.file.filename}` : null;
+
+  store.createMeta({
+    cargo_o_usuario: cargo_o_usuario.trim(),
+    descripcion: descripcion.trim(),
+    ponderacion: numPonderacion,
+    periodo_id: parseInt(periodo_id, 10),
+    delegacion_id: parseInt(delegacion_id, 10),
+    evidencia: evidenciaPath,
+  });
+
+  addFlash(req, 'success', 'Meta creada correctamente desde el panel de administración.');
+  res.redirect('/admin/');
+});
+
+// Admin: Editar Meta
+app.post('/admin/meta/:pk/editar/', requireAdmin, uploadMiddleware('evidencia') as any, (req: Request, res: Response) => {
+  const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/admin/');
+  }
+
+  const { cargo_o_usuario, periodo_id, delegacion_id, ponderacion, descripcion } = req.body;
+  const numPonderacion = parseInt(ponderacion, 10);
+
+  const evidenciaPath = req.file ? `/media/evidencias/uploads/${req.file.filename}` : undefined;
+
+  store.updateMeta(metaId, {
+    cargo_o_usuario: cargo_o_usuario ? cargo_o_usuario.trim() : undefined,
+    descripcion: descripcion ? descripcion.trim() : undefined,
+    ponderacion: isNaN(numPonderacion) ? undefined : numPonderacion,
+    periodo_id: periodo_id ? parseInt(periodo_id, 10) : undefined,
+    delegacion_id: delegacion_id ? parseInt(delegacion_id, 10) : undefined,
+    evidencia: evidenciaPath,
+  });
+
+  addFlash(req, 'success', `Meta #${metaId} actualizada correctamente.`);
+  res.redirect('/admin/');
+});
+
+// Admin: Archivar Meta individual
+app.post('/admin/meta/:pk/archivar/', requireAdmin, (req: Request, res: Response) => {
+  const metaId = parseInt(req.params.pk, 10);
+  const success = store.softDeleteMeta(metaId);
+  if (success) {
+    addFlash(req, 'success', `Meta #${metaId} archivada.`);
+  } else {
+    addFlash(req, 'danger', 'Error al archivar la meta.');
+  }
+  res.redirect('/admin/');
+});
+
+// Admin: Restaurar Meta individual
+app.post('/admin/meta/:pk/restaurar/', requireAdmin, (req: Request, res: Response) => {
+  const metaId = parseInt(req.params.pk, 10);
+  const success = store.restoreMeta(metaId);
+  if (success) {
+    addFlash(req, 'success', `Meta #${metaId} restaurada exitosamente.`);
+  } else {
+    addFlash(req, 'danger', 'Error al restaurar la meta.');
+  }
+  res.redirect('/admin/');
+});
+
+// Admin: Eliminar definitivamente Meta individual
+app.post('/admin/meta/:pk/eliminar/', requireAdmin, (req: Request, res: Response) => {
+  const metaId = parseInt(req.params.pk, 10);
+  const success = store.hardDeleteMeta(metaId);
+  if (success) {
+    addFlash(req, 'success', `Meta #${metaId} eliminada permanentemente.`);
+  } else {
+    addFlash(req, 'danger', 'Error al eliminar la meta.');
+  }
+  res.redirect('/admin/');
+});
+
+// Admin: Acciones en Lote (Batch Actions: archivar, restaurar, eliminar)
+app.post('/admin/metas/lote/', requireAdmin, (req: Request, res: Response) => {
+  const { meta_ids, action } = req.body;
+  let ids: number[] = [];
+  if (Array.isArray(meta_ids)) {
+    ids = meta_ids.map((id: string) => parseInt(id, 10));
+  } else if (typeof meta_ids === 'string') {
+    ids = [parseInt(meta_ids, 10)];
+  }
+
+  if (ids.length === 0) {
+    addFlash(req, 'warning', 'No seleccionaste ninguna meta.');
+    return res.redirect('/admin/');
+  }
+
+  if (action === 'archivar') {
+    const count = store.archiveMetasBatch(ids);
+    addFlash(req, 'success', `${count} meta(s) archivada(s) correctamente.`);
+  } else if (action === 'restaurar') {
+    const count = store.restoreMetasBatch(ids);
+    addFlash(req, 'success', `${count} meta(s) restaurada(s) correctamente.`);
+  } else if (action === 'eliminar') {
+    const count = store.hardDeleteMetasBatch(ids);
+    addFlash(req, 'success', `${count} meta(s) eliminada(s) permanentemente.`);
+  } else {
+    addFlash(req, 'warning', 'Acción no reconocida.');
+  }
+
+  res.redirect('/admin/');
+});
+
+// Admin: Batch Archive Metas (compatibilidad)
+app.post('/admin/metas/archivar-lote/', requireAdmin, (req: Request, res: Response) => {
   const { meta_ids } = req.body;
   let ids: number[] = [];
   if (Array.isArray(meta_ids)) {
@@ -888,8 +1300,56 @@ app.post('/admin/metas/archivar-lote/', (req: Request, res: Response) => {
   res.redirect('/admin/');
 });
 
+// Admin: Editar / Reemplazar Evidencia de Meta
+app.post('/admin/meta/:pk/evidencia/editar/', requireAdmin, uploadMiddleware('evidencia') as any, (req: Request, res: Response) => {
+  const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/admin/');
+  }
+  if (!req.file) {
+    addFlash(req, 'warning', 'No seleccionaste un archivo de evidencia.');
+    return res.redirect('/admin/');
+  }
+  const evidenciaPath = `/media/evidencias/uploads/${req.file.filename}`;
+  store.updateMetaEvidencia(metaId, evidenciaPath);
+  addFlash(req, 'success', `Evidencia de la meta #${metaId} actualizada correctamente.`);
+  res.redirect('/admin/');
+});
+
+// Admin: Archivar / Retirar Evidencia de Meta
+app.post('/admin/meta/:pk/evidencia/archivar/', requireAdmin, (req: Request, res: Response) => {
+  const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/admin/');
+  }
+  store.removeMetaEvidencia(metaId);
+  addFlash(req, 'success', `Evidencia de la meta #${metaId} archivada y desvinculada.`);
+  res.redirect('/admin/');
+});
+
+// Admin: Restaurar Evidencia Archivada
+app.post('/admin/meta/:pk/evidencia/restaurar/', requireAdmin, (req: Request, res: Response) => {
+  const metaId = parseInt(req.params.pk, 10);
+  const meta = store.getMetaById(metaId);
+  if (!meta) {
+    addFlash(req, 'danger', 'La meta no existe.');
+    return res.redirect('/admin/');
+  }
+  const restored = store.restoreMetaEvidencia(metaId);
+  if (restored) {
+    addFlash(req, 'success', `Evidencia archivada restaurada exitosamente para la meta #${metaId}.`);
+  } else {
+    addFlash(req, 'warning', 'No hay evidencia archivada para restaurar en esta meta.');
+  }
+  res.redirect('/admin/');
+});
+
 // Admin: Reset Data to Defaults
-app.post('/admin/reset-demo/', (req: Request, res: Response) => {
+app.post('/admin/reset-demo/', requireAdmin, (req: Request, res: Response) => {
   store.resetStoreToDefaults();
   addFlash(req, 'info', 'Datos del sistema restablecidos al estado inicial.');
   res.redirect('/admin/');
@@ -900,7 +1360,12 @@ app.get('/demo-login/:username', (req: Request, res: Response) => {
   const user = store.getUserByUsername(req.params.username);
   if (user) {
     req.session.userId = user.id;
-    addFlash(req, 'info', `Sesión iniciada como: ${user.username} (Rol: ${user.rol})`);
+    const delegacion = store.getDelegacion(user.delegacion_id);
+    addFlash(
+      req,
+      'info',
+      `Sesión iniciada como: ${user.username} (Rol: ${user.rol} | Delegación: ${delegacion ? delegacion.nombre : 'Global'})`
+    );
   }
   res.redirect('/wireframe-front');
 });

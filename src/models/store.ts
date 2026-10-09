@@ -42,6 +42,7 @@ export interface MetaItem {
   ponderacion: number;
   periodo_id: number;
   evidencia: string | null;
+  evidencias_archivadas?: string[];
   deleted_at: string | null;
 }
 
@@ -67,12 +68,12 @@ class Store {
   metas: MetaItem[] = [];
   resetCodes: PasswordResetCodeItem[] = [];
 
-  nextMetaId = 5;
+  nextMetaId = 8;
   nextResetCodeId = 1;
   nextDelegacionId = 5;
   nextPeriodoId = 3;
   nextServicioId = 5;
-  nextUserId = 5;
+  nextUserId = 6;
 
   constructor() {
     this.init();
@@ -89,12 +90,12 @@ class Store {
         this.users = data.users || [];
         this.metas = data.metas || [];
         this.resetCodes = data.resetCodes || [];
-        this.nextMetaId = data.nextMetaId || 5;
+        this.nextMetaId = data.nextMetaId || 8;
         this.nextResetCodeId = data.nextResetCodeId || 1;
         this.nextDelegacionId = data.nextDelegacionId || 5;
         this.nextPeriodoId = data.nextPeriodoId || 3;
         this.nextServicioId = data.nextServicioId || 5;
-        this.nextUserId = data.nextUserId || 5;
+        this.nextUserId = data.nextUserId || 6;
         return;
       } catch (e) {
         console.warn('Could not read existing store file, initializing defaults');
@@ -104,7 +105,7 @@ class Store {
     this.save();
   }
 
-  private save() {
+  save() {
     try {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -129,7 +130,7 @@ class Store {
     }
   }
 
-  private seedDefaults() {
+  seedDefaults() {
     this.delegaciones = [
       { id: 1, nombre: 'Delegación La Serena Centro', activa: true },
       { id: 2, nombre: 'Delegación Las Compañías', activa: true },
@@ -193,6 +194,15 @@ class Store {
       },
       {
         id: 4,
+        username: 'funcionario_rural',
+        email: 'rural@laserena.cl',
+        passwordHash: bcrypt.hashSync('laserena2026', 8),
+        is_superuser: false,
+        delegacion_id: 3,
+        rol: 'FUNCIONARIO',
+      },
+      {
+        id: 5,
         username: 'verificador_municipal',
         email: 'verificador@laserena.cl',
         passwordHash: bcrypt.hashSync('laserena2026', 8),
@@ -203,6 +213,7 @@ class Store {
     ];
 
     this.metas = [
+      // Delegación 1: La Serena Centro (Total 100%)
       {
         id: 1,
         delegacion_id: 1,
@@ -227,23 +238,58 @@ class Store {
         id: 3,
         delegacion_id: 1,
         cargo_o_usuario: 'Encargado de Gestión Social',
-        descripcion: 'Seguimiento y apoyo a programas sociales en sectores prioritarios.',
+        descripcion: 'Seguimiento y apoyo a programas sociales en sectores prioritarios del centro.',
         ponderacion: 30,
         periodo_id: 1,
         evidencia: null,
         deleted_at: null,
       },
+      // Delegación 2: Las Compañías (Total 100%)
       {
         id: 4,
         delegacion_id: 2,
         cargo_o_usuario: 'Jefe de Delegación Las Compañías',
-        descripcion: 'Supervisión general de operativos y servicios municipales descentralizados.',
+        descripcion: 'Supervisión general de operativos y servicios municipales descentralizados en el sector Las Compañías.',
         ponderacion: 50,
         periodo_id: 1,
         evidencia: null,
         deleted_at: null,
       },
+      {
+        id: 5,
+        delegacion_id: 2,
+        cargo_o_usuario: 'Inspector Territorial Las Compañías',
+        descripcion: 'Fiscalización y control de ordenanza municipal en ferias libres y comercio sectorial.',
+        ponderacion: 50,
+        periodo_id: 1,
+        evidencia: null,
+        deleted_at: null,
+      },
+      // Delegación 3: Rural (Total 100%)
+      {
+        id: 6,
+        delegacion_id: 3,
+        cargo_o_usuario: 'Gestor Comunitario Rural',
+        descripcion: 'Operativos de abastecimiento de agua y apoyo técnico social a juntas de vecinos de Algarrobito y El Romero.',
+        ponderacion: 60,
+        periodo_id: 1,
+        evidencia: null,
+        deleted_at: null,
+      },
+      {
+        id: 7,
+        delegacion_id: 3,
+        cargo_o_usuario: 'Coordinador Operativo Rural',
+        descripcion: 'Mantenimiento de caminos vecinales y coordinación con APR en localidades rurales.',
+        ponderacion: 40,
+        periodo_id: 1,
+        evidencia: null,
+        deleted_at: null,
+      },
     ];
+
+    this.nextMetaId = 8;
+    this.nextUserId = 6;
   }
 
   // Delegaciones
@@ -385,7 +431,7 @@ class Store {
     return { success: true, user: u };
   }
 
-  // Metas
+  // Metas Query with Strict Delegation Scoping
   getMetas(options: {
     user?: User | null;
     delegacionId?: number;
@@ -402,10 +448,13 @@ class Store {
       list = list.filter((m) => m.deleted_at !== null);
     }
 
-    // Role-based scoping
+    // Role-based delegation scoping:
+    // If the user is logged in and is NOT an admin, STRICTLY filter by their own delegation.
+    // They cannot see metas of any other delegation under any circumstances.
     if (options.user && !options.user.is_superuser && options.user.rol !== 'ADMIN') {
       list = list.filter((m) => m.delegacion_id === options.user!.delegacion_id);
     } else if (options.delegacionId) {
+      // Admins (or the public portal) can filter by a selected delegation
       list = list.filter((m) => m.delegacion_id === options.delegacionId);
     }
 
@@ -483,10 +532,60 @@ class Store {
     return meta;
   }
 
+  updateMetaEvidencia(id: number, evidenciaPath: string | null): boolean {
+    const meta = this.getMetaById(id);
+    if (!meta) return false;
+    if (meta.evidencia && meta.evidencia !== evidenciaPath) {
+      if (!meta.evidencias_archivadas) meta.evidencias_archivadas = [];
+      if (!meta.evidencias_archivadas.includes(meta.evidencia)) {
+        meta.evidencias_archivadas.push(meta.evidencia);
+      }
+    }
+    meta.evidencia = evidenciaPath;
+    this.save();
+    return true;
+  }
+
+  removeMetaEvidencia(id: number): boolean {
+    const meta = this.getMetaById(id);
+    if (!meta) return false;
+    if (meta.evidencia) {
+      if (!meta.evidencias_archivadas) meta.evidencias_archivadas = [];
+      if (!meta.evidencias_archivadas.includes(meta.evidencia)) {
+        meta.evidencias_archivadas.push(meta.evidencia);
+      }
+    }
+    meta.evidencia = null;
+    this.save();
+    return true;
+  }
+
+  archiveMetaEvidencia(id: number): boolean {
+    return this.removeMetaEvidencia(id);
+  }
+
+  restoreMetaEvidencia(id: number, filePath?: string): boolean {
+    const meta = this.getMetaById(id);
+    if (!meta || !meta.evidencias_archivadas || meta.evidencias_archivadas.length === 0) return false;
+    const target = filePath || meta.evidencias_archivadas[meta.evidencias_archivadas.length - 1];
+    meta.evidencias_archivadas = meta.evidencias_archivadas.filter((f) => f !== target);
+    meta.evidencia = target;
+    this.save();
+    return true;
+  }
+
   softDeleteMeta(id: number): boolean {
     const meta = this.getMetaById(id);
     if (!meta) return false;
     meta.deleted_at = new Date().toISOString();
+    this.save();
+    return true;
+  }
+
+  hardDeleteMeta(id: number): boolean {
+    const index = this.metas.findIndex((m) => m.id === id);
+    if (index === -1) return false;
+    this.metas.splice(index, 1);
     this.save();
     return true;
   }
@@ -509,6 +608,27 @@ class Store {
         count++;
       }
     }
+    if (count > 0) this.save();
+    return count;
+  }
+
+  restoreMetasBatch(ids: number[]): number {
+    let count = 0;
+    for (const id of ids) {
+      const meta = this.getMetaById(id);
+      if (meta && meta.deleted_at) {
+        meta.deleted_at = null;
+        count++;
+      }
+    }
+    if (count > 0) this.save();
+    return count;
+  }
+
+  hardDeleteMetasBatch(ids: number[]): number {
+    const initialLen = this.metas.length;
+    this.metas = this.metas.filter((m) => !ids.includes(m.id));
+    const count = initialLen - this.metas.length;
     if (count > 0) this.save();
     return count;
   }

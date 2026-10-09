@@ -6,6 +6,14 @@
     <title>SGR La Serena - Panel de Administración</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .clickable-row {
+            cursor: pointer;
+        }
+        .clickable-row:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
 </head>
 <body class="bg-light">
 
@@ -36,7 +44,12 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h3 class="fw-bold text-dark mb-1">Mantenedores del Sistema</h3>
-                <p class="text-muted mb-0">Gestión de delegaciones, períodos contables, catálogo de prestaciones y usuarios del SGR Municipal.</p>
+                <p class="text-muted mb-0">Gestión global de delegaciones, períodos contables, catálogo de prestaciones y metas del SGR Municipal.</p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#adminCreateMetaModal">
+                    + Registrar Nueva Meta (Admin)
+                </button>
             </div>
         </div>
 
@@ -156,44 +169,77 @@
             </div>
         </div>
 
-        <!-- Metas y Acción de Archivo en Lote (Django Admin Action: archive_metas) -->
+        <!-- Metas y Control Masivo / Edición en Administrador -->
         <div class="card shadow-sm border-0">
-            <div class="card-header bg-white py-3">
-                <h5 class="mb-0 fw-bold text-primary">Control de Metas (Acción en Lote / Batch Archive)</h5>
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0 fw-bold text-primary">Gestión de Metas Institucionales (Panel Administrador)</h5>
+                    <small class="text-muted">Haz clic en el cargo de cualquier meta o en el botón <strong>"Editar"</strong> para modificarla. Usa las casillas para aplicar acciones en lote.</small>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#adminCreateMetaModal">
+                    + Nueva Meta
+                </button>
             </div>
-            <form action="/admin/metas/archivar-lote/" method="post">
-                <div class="p-3 bg-light border-bottom d-flex align-items-center">
-                    <span class="me-2 small fw-semibold">Acción seleccionada:</span>
-                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold" onclick="return confirm('¿Archivar todas las metas seleccionadas?')">
-                        Archivar metas seleccionadas (Borrado Lógico)
+            <form id="batchForm" action="/admin/metas/lote/" method="post">
+                <div class="p-3 bg-light border-bottom d-flex flex-wrap align-items-center gap-2">
+                    <span class="small fw-semibold text-secondary">Acción en lote para seleccionadas:</span>
+                    <select name="action" id="batchActionSelect" class="form-select form-select-sm w-auto" required>
+                        <option value="archivar">Archivar seleccionadas (Borrado Lógico)</option>
+                        <option value="restaurar">Restaurar seleccionadas</option>
+                        <option value="eliminar">Eliminar definitivamente (Borrado Físico)</option>
+                    </select>
+                    <button type="button" class="btn btn-sm btn-primary fw-bold" id="applyBatchBtn">
+                        Aplicar a seleccionadas
                     </button>
+                    <span id="selectedCountBadge" class="badge bg-secondary ms-2">0 seleccionadas</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th style="width: 40px;"><input type="checkbox" id="selectAllMetas" onchange="toggleAllMetas(this)"></th>
+                                <th style="width: 45px;" class="text-center">
+                                    <input type="checkbox" id="selectAllMetas" class="form-check-input" title="Seleccionar todas">
+                                </th>
                                 <th>ID</th>
-                                <th>Cargo / Usuario</th>
+                                <th>Cargo / Responsable (Click para editar)</th>
                                 <th>Delegación</th>
                                 <th>Período</th>
                                 <th>Ponderación</th>
                                 <th>Estado</th>
+                                <th>Evidencia</th>
+                                <th class="text-end pe-4">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             <% metas.forEach(m => { %>
-                                <tr>
-                                    <td>
-                                        <% if (!m.deleted_at) { %>
-                                            <input type="checkbox" name="meta_ids" value="<%= m.id %>" class="meta-checkbox">
-                                        <% } %>
+                                <tr id="row-meta-<%= m.id %>">
+                                    <td class="text-center">
+                                        <input type="checkbox" name="meta_ids" value="<%= m.id %>" class="form-check-input meta-checkbox" data-id="<%= m.id %>">
                                     </td>
-                                    <td>#<%= m.id %></td>
-                                    <td><strong><%= m.cargo_o_usuario %></strong></td>
-                                    <td><%= m.delegacionNombre %></td>
-                                    <td><%= m.periodoLabel %></td>
-                                    <td><span class="badge bg-primary"><%= m.ponderacion %>%</span></td>
+                                    <td><span class="text-muted small">#<%= m.id %></span></td>
+                                    <td>
+                                        <!-- Click directo en la meta para editarla en el panel de administrador -->
+                                        <a href="javascript:void(0)" 
+                                           class="fw-bold text-decoration-none text-primary js-admin-edit-btn"
+                                           data-bs-toggle="modal"
+                                           data-bs-target="#adminEditMetaModal"
+                                           data-id="<%= m.id %>"
+                                           data-cargo="<%= m.cargo_o_usuario %>"
+                                           data-delegacion="<%= m.delegacion_id %>"
+                                           data-periodo="<%= m.periodo_id %>"
+                                           data-ponderacion="<%= m.ponderacion %>"
+                                           data-desc="<%= m.descripcion %>"
+                                           data-evidencia="<%= m.evidencia || '' %>"
+                                           title="Editar esta meta">
+                                            ✏️ <%= m.cargo_o_usuario %>
+                                        </a>
+                                        <div class="text-muted small text-truncate" style="max-width: 240px;" title="<%= m.descripcion %>">
+                                            <%= m.descripcion %>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge text-bg-light border text-secondary"><%= m.delegacionNombre %></span></td>
+                                    <td><small class="text-muted"><%= m.periodoLabel %></small></td>
+                                    <td><span class="badge bg-primary fs-6"><%= m.ponderacion %>%</span></td>
                                     <td>
                                         <% if (m.deleted_at) { %>
                                             <span class="badge bg-danger">Archivada</span>
@@ -201,12 +247,340 @@
                                             <span class="badge bg-success">Activa</span>
                                         <% } %>
                                     </td>
+                                    <td>
+                                        <!-- Evidencia con botones para Administrador (Editar y/o Archivar) -->
+                                        <% if (m.evidencia) { %>
+                                            <div>
+                                                <div class="d-flex align-items-center gap-1 mb-1">
+                                                    <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 js-preview-img" 
+                                                            data-src="<%= m.evidencia %>" 
+                                                            data-title="Meta #<%= m.id %> - <%= m.cargo_o_usuario %>">
+                                                        🔍 Ver
+                                                    </button>
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.72rem;">Adjunta</span>
+                                                </div>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 js-admin-edit-evidencia-btn"
+                                                            data-id="<%= m.id %>"
+                                                            data-cargo="<%= m.cargo_o_usuario %>"
+                                                            data-evidencia="<%= m.evidencia %>"
+                                                            title="Editar o reemplazar archivo de evidencia">
+                                                        ✏️ Editar
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2 js-admin-archive-evidencia-btn"
+                                                            data-id="<%= m.id %>"
+                                                            data-cargo="<%= m.cargo_o_usuario %>"
+                                                            title="Archivar evidencia de esta meta">
+                                                        📦 Archivar
+                                                    </button>
+                                                </div>
+                                                <% if (m.evidencias_archivadas && m.evidencias_archivadas.length > 0) { %>
+                                                    <div class="mt-1">
+                                                        <span class="badge bg-light text-secondary border" style="font-size: 0.7rem;" title="<%= m.evidencias_archivadas.length %> archivo(s) archivado(s) en historial">
+                                                            📦 <%= m.evidencias_archivadas.length %> previa(s)
+                                                        </span>
+                                                    </div>
+                                                <% } %>
+                                            </div>
+                                        <% } else { %>
+                                            <div>
+                                                <span class="text-muted small d-block mb-1">Sin evidencia</span>
+                                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 js-admin-edit-evidencia-btn"
+                                                        data-id="<%= m.id %>"
+                                                        data-cargo="<%= m.cargo_o_usuario %>"
+                                                        data-evidencia=""
+                                                        title="Subir archivo de evidencia para esta meta">
+                                                    ➕ Subir
+                                                </button>
+                                                <% if (m.evidencias_archivadas && m.evidencias_archivadas.length > 0) { %>
+                                                    <div class="mt-1">
+                                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size: 0.7rem;">
+                                                            📦 <%= m.evidencias_archivadas.length %> previa(s)
+                                                        </span>
+                                                        <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none ms-1 js-admin-restore-evidencia-btn"
+                                                                data-id="<%= m.id %>"
+                                                                data-cargo="<%= m.cargo_o_usuario %>"
+                                                                style="font-size: 0.75rem;"
+                                                                title="Restaurar última evidencia archivada">
+                                                            Restaurar
+                                                        </button>
+                                                    </div>
+                                                <% } %>
+                                            </div>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <!-- Botón Editar Meta -->
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary me-1 js-admin-edit-btn"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#adminEditMetaModal"
+                                                data-id="<%= m.id %>"
+                                                data-cargo="<%= m.cargo_o_usuario %>"
+                                                data-delegacion="<%= m.delegacion_id %>"
+                                                data-periodo="<%= m.periodo_id %>"
+                                                data-ponderacion="<%= m.ponderacion %>"
+                                                data-desc="<%= m.descripcion %>"
+                                                data-evidencia="<%= m.evidencia || '' %>">
+                                            Editar
+                                        </button>
+
+                                        <!-- Dropdown de Evidencia para Administrador -->
+                                        <div class="btn-group btn-group-sm me-1">
+                                            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Gestionar evidencia">
+                                                📷 Evidencia
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                                <% if (m.evidencia) { %>
+                                                    <li>
+                                                        <a class="dropdown-item js-preview-img" href="javascript:void(0)" data-src="<%= m.evidencia %>" data-title="Meta #<%= m.id %> - <%= m.cargo_o_usuario %>">
+                                                            🔍 Ver evidencia actual
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item js-admin-edit-evidencia-btn" href="javascript:void(0)" data-id="<%= m.id %>" data-cargo="<%= m.cargo_o_usuario %>" data-evidencia="<%= m.evidencia %>">
+                                                            ✏️ Editar / Reemplazar evidencia
+                                                        </a>
+                                                    </li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <a class="dropdown-item text-warning js-admin-archive-evidencia-btn" href="javascript:void(0)" data-id="<%= m.id %>" data-cargo="<%= m.cargo_o_usuario %>">
+                                                            📦 Archivar evidencia
+                                                        </a>
+                                                    </li>
+                                                <% } else { %>
+                                                    <li>
+                                                        <a class="dropdown-item js-admin-edit-evidencia-btn" href="javascript:void(0)" data-id="<%= m.id %>" data-cargo="<%= m.cargo_o_usuario %>" data-evidencia="">
+                                                            ➕ Subir nueva evidencia
+                                                        </a>
+                                                    </li>
+                                                    <% if (m.evidencias_archivadas && m.evidencias_archivadas.length > 0) { %>
+                                                        <li>
+                                                            <a class="dropdown-item text-success js-admin-restore-evidencia-btn" href="javascript:void(0)" data-id="<%= m.id %>" data-cargo="<%= m.cargo_o_usuario %>">
+                                                                ♻️ Restaurar evidencia previa (<%= m.evidencias_archivadas.length %>)
+                                                            </a>
+                                                        </li>
+                                                    <% } %>
+                                                <% } %>
+                                            </ul>
+                                        </div>
+
+                                        <!-- Botón Archivar o Restaurar Meta -->
+                                        <% if (!m.deleted_at) { %>
+                                            <button type="button" class="btn btn-sm btn-outline-warning me-1 js-archive-single-btn" data-id="<%= m.id %>">
+                                                Archivar
+                                            </button>
+                                        <% } else { %>
+                                            <button type="button" class="btn btn-sm btn-outline-success me-1 js-restore-single-btn" data-id="<%= m.id %>">
+                                                Restaurar
+                                            </button>
+                                        <% } %>
+
+                                        <!-- Botón Eliminar Definitivamente -->
+                                        <button type="button" class="btn btn-sm btn-outline-danger js-delete-single-btn" data-id="<%= m.id %>">
+                                            Eliminar
+                                        </button>
+                                    </td>
                                 </tr>
                             <% }) %>
                         </tbody>
                     </table>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Hidden forms for single actions -->
+    <form id="singleArchiveForm" method="post" style="display:none;"></form>
+    <form id="singleRestoreForm" method="post" style="display:none;"></form>
+    <form id="singleDeleteForm" method="post" style="display:none;"></form>
+    <form id="singleArchiveEvidenciaForm" method="post" style="display:none;"></form>
+    <form id="singleRestoreEvidenciaForm" method="post" style="display:none;"></form>
+
+    <!-- Modal: Editar Meta (Admin) -->
+    <div class="modal fade" id="adminEditMetaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <form id="adminEditMetaForm" method="post" enctype="multipart/form-data">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold" id="adminEditModalTitle">Editar Meta Institucional</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Cargo / Funcionario Asignado:</label>
+                            <input type="text" name="cargo_o_usuario" id="edit_cargo" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Delegación Responsable:</label>
+                            <select name="delegacion_id" id="edit_delegacion" class="form-select" required>
+                                <% delegaciones.forEach(d => { %>
+                                    <option value="<%= d.id %>"><%= d.nombre %> <%= !d.activa ? '(Inactiva)' : '' %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Período de Evaluación:</label>
+                            <select name="periodo_id" id="edit_periodo" class="form-select" required>
+                                <% periodos.forEach(p => { %>
+                                    <option value="<%= p.id %>"><%= p.label %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Ponderación (% de 1 a 100):</label>
+                            <input type="number" name="ponderacion" id="edit_ponderacion" class="form-control" min="1" max="100" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Descripción del Compromiso:</label>
+                            <textarea name="descripcion" id="edit_descripcion" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Evidencia Adjunta:</label>
+                            <div id="edit_evidencia_preview_box" class="p-2 border rounded bg-light mb-2 d-none">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center">
+                                        <img id="edit_evidencia_img" src="" alt="Evidencia" style="width: 48px; height: 48px; object-fit: cover;" class="rounded border me-2">
+                                        <div>
+                                            <span class="small fw-semibold d-block text-success">✓ Archivo asignado</span>
+                                            <a id="edit_evidencia_link" href="" target="_blank" class="small text-decoration-none">Ver archivo</a>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="edit_modal_archive_evidencia_btn" class="btn btn-sm btn-outline-warning" title="Archivar la evidencia actual">
+                                        📦 Archivar Evidencia
+                                    </button>
+                                </div>
+                            </div>
+                            <label class="form-label fw-semibold small text-muted">Actualizar / Reemplazar Evidencia (Imagen JPG o PNG, máx 2MB):</label>
+                            <input type="file" name="evidencia" id="edit_evidencia_input" class="form-control" accept=".jpg,.jpeg,.png">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar / Gestionar Evidencia Dedicado (Admin) -->
+    <div class="modal fade" id="adminEvidenciaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <form id="adminEvidenciaForm" method="post" enctype="multipart/form-data">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title fw-bold" id="adminEvidenciaModalTitle">Gestionar Evidencia</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="adminCurrentEvidenciaBox" class="mb-3 p-3 bg-light rounded border text-center d-none">
+                            <label class="form-label fw-bold text-muted small d-block text-start mb-2">Evidencia Actual Adjunta:</label>
+                            <img id="adminEvidenciaPreviewThumb" src="" alt="Vista previa" class="img-fluid rounded border mb-2" style="max-height: 160px; object-fit: contain;">
+                            <div class="d-flex justify-content-center gap-2">
+                                <a id="adminEvidenciaFullLink" href="" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    🔍 Ver Completa
+                                </a>
+                                <button type="button" id="adminEvidenciaModalArchiveBtn" class="btn btn-sm btn-outline-warning">
+                                    📦 Archivar esta evidencia
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" id="adminEvidenciaInputLabel">Seleccionar archivo de evidencia (JPG o PNG, máx 2MB):</label>
+                            <input type="file" name="evidencia" id="adminEvidenciaInputFile" class="form-control" accept=".jpg,.jpeg,.png" required>
+                            <div class="form-text">Formatos permitidos: .jpg, .jpeg, .png. Tamaño máximo: 2 MB.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold" id="adminEvidenciaSubmitBtn">Guardar Evidencia</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Visualizador de Imagen / Evidencia (Lightbox) -->
+    <div class="modal fade" id="adminPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="adminPreviewModalTitle">Visualización de Evidencia</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-3 bg-light">
+                    <img id="adminPreviewModalImg" src="" alt="Evidencia" class="img-fluid rounded border shadow-sm" style="max-height: 70vh;">
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <div>
+                        <button type="button" id="adminPreviewModalEditBtn" class="btn btn-sm btn-outline-primary me-2">
+                            ✏️ Editar Evidencia
+                        </button>
+                        <button type="button" id="adminPreviewModalArchiveBtn" class="btn btn-sm btn-outline-warning">
+                            📦 Archivar Evidencia
+                        </button>
+                    </div>
+                    <div>
+                        <a id="adminPreviewModalLink" href="" target="_blank" class="btn btn-sm btn-primary me-2">Abrir pestaña nueva</a>
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Registrar Nueva Meta (Admin) -->
+    <div class="modal fade" id="adminCreateMetaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <form action="/admin/meta/nueva/" method="post" enctype="multipart/form-data">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title fw-bold">Registrar Nueva Meta (Admin)</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Cargo / Funcionario:</label>
+                            <input type="text" name="cargo_o_usuario" class="form-control" placeholder="Ej: Inspector de Terreno" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Delegación Responsable:</label>
+                            <select name="delegacion_id" class="form-select" required>
+                                <% delegaciones.forEach(d => { %>
+                                    <% if (d.activa) { %>
+                                        <option value="<%= d.id %>"><%= d.nombre %></option>
+                                    <% } %>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Período de Evaluación:</label>
+                            <select name="periodo_id" class="form-select" required>
+                                <% periodos.forEach(p => { %>
+                                    <option value="<%= p.id %>"><%= p.label %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Ponderación (% de 1 a 100):</label>
+                            <input type="number" name="ponderacion" class="form-control" min="1" max="100" placeholder="Ej: 30" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Descripción del Compromiso:</label>
+                            <textarea name="descripcion" class="form-control" rows="3" placeholder="Detalle de actividades y metas..." required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Evidencia (Opcional - JPG o PNG, máx 2MB):</label>
+                            <input type="file" name="evidencia" class="form-control" accept=".jpg,.jpeg,.png">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Crear Meta</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -334,7 +708,7 @@
                                     <% } %>
                                 <% }) %>
                             </select>
-                            <small class="text-muted">Solo se listan delegaciones activas (conforme a la regla del modelo original).</small>
+                            <small class="text-muted">Solo se listan delegaciones activas.</small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -348,10 +722,320 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function toggleAllMetas(source) {
-            const checkboxes = document.querySelectorAll('.meta-checkbox');
-            checkboxes.forEach(cb => cb.checked = source.checked);
+        // Checkboxes & selection counter
+        const selectAll = document.getElementById('selectAllMetas');
+        const checkboxes = document.querySelectorAll('.meta-checkbox');
+        const badge = document.getElementById('selectedCountBadge');
+
+        function updateCount() {
+            const checked = document.querySelectorAll('.meta-checkbox:checked').length;
+            badge.textContent = checked + ' seleccionada(s)';
+            if (selectAll) {
+                selectAll.checked = checked > 0 && checked === checkboxes.length;
+            }
         }
+
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                checkboxes.forEach(cb => cb.checked = this.checked);
+                updateCount();
+            });
+        }
+
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', updateCount);
+        });
+
+        // Batch Action Button with Confirmation
+        document.getElementById('applyBatchBtn').addEventListener('click', function () {
+            const count = document.querySelectorAll('.meta-checkbox:checked').length;
+            if (count === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sin selección',
+                    text: 'Por favor selecciona al menos una meta con la casilla correspondiente.'
+                });
+                return;
+            }
+
+            const action = document.getElementById('batchActionSelect').value;
+            let title = '¿Confirmar acción en lote?';
+            let text = `Se aplicará la acción a ${count} meta(s) seleccionada(s).`;
+            let confirmBtn = 'Sí, continuar';
+            let confirmColor = '#0d6efd';
+
+            if (action === 'eliminar') {
+                title = '¿Eliminar definitivamente las metas seleccionadas?';
+                text = `Se borrarán permanentemente ${count} meta(s) de la base de datos. ¡Esta acción no se puede deshacer!`;
+                confirmBtn = 'Sí, eliminar definitivamente';
+                confirmColor = '#dc3545';
+            } else if (action === 'archivar') {
+                title = '¿Archivar las metas seleccionadas?';
+                text = `${count} meta(s) pasarán al estado archivado (borrado lógico).`;
+                confirmBtn = 'Sí, archivar';
+                confirmColor = '#ffc107';
+            }
+
+            Swal.fire({
+                title: title,
+                text: text,
+                icon: action === 'eliminar' ? 'warning' : 'question',
+                showCancelButton: true,
+                confirmButtonText: confirmBtn,
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: confirmColor
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('batchForm').submit();
+                }
+            });
+        });
+
+        let currentActiveMetaForEvidencia = null;
+
+        // Trigger Archive Evidencia with SweetAlert2 confirmation
+        function triggerArchiveEvidencia(id, cargo) {
+            Swal.fire({
+                title: '¿Archivar evidencia?',
+                text: `Se retirará el archivo de evidencia de la meta #${id} (${cargo}) y se enviará al historial de evidencias archivadas sin eliminar la meta institucional.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, archivar evidencia',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#ffc107'
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    const form = document.getElementById('singleArchiveEvidenciaForm');
+                    form.action = `/admin/meta/${id}/evidencia/archivar/`;
+                    form.submit();
+                }
+            });
+        }
+
+        // Open Dedicated Evidence Modal (Edit or Upload)
+        document.querySelectorAll('.js-admin-edit-evidencia-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-id');
+                const cargo = this.getAttribute('data-cargo');
+                const evidencia = this.getAttribute('data-evidencia');
+                currentActiveMetaForEvidencia = { id, cargo, evidencia };
+
+                document.getElementById('adminEvidenciaModalTitle').textContent = `Gestionar Evidencia - Meta #${id} (${cargo})`;
+                document.getElementById('adminEvidenciaForm').action = `/admin/meta/${id}/evidencia/editar/`;
+                
+                const container = document.getElementById('adminCurrentEvidenciaBox');
+                const thumb = document.getElementById('adminEvidenciaPreviewThumb');
+                const link = document.getElementById('adminEvidenciaFullLink');
+                const fileInput = document.getElementById('adminEvidenciaInputFile');
+                fileInput.value = '';
+
+                if (evidencia && evidencia.trim()) {
+                    container.classList.remove('d-none');
+                    thumb.src = evidencia;
+                    link.href = evidencia;
+                    document.getElementById('adminEvidenciaInputLabel').textContent = 'Reemplazar por nueva evidencia (JPG o PNG, máx 2MB):';
+                    document.getElementById('adminEvidenciaSubmitBtn').textContent = 'Guardar / Reemplazar Evidencia';
+                } else {
+                    container.classList.add('d-none');
+                    thumb.src = '';
+                    link.href = '';
+                    document.getElementById('adminEvidenciaInputLabel').textContent = 'Seleccionar archivo de evidencia (JPG o PNG, máx 2MB):';
+                    document.getElementById('adminEvidenciaSubmitBtn').textContent = 'Subir Evidencia';
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('adminEvidenciaModal'));
+                modal.show();
+            });
+        });
+
+        // Archive evidence from inside the dedicated modal
+        const modalArchiveBtn = document.getElementById('adminEvidenciaModalArchiveBtn');
+        if (modalArchiveBtn) {
+            modalArchiveBtn.addEventListener('click', function () {
+                if (!currentActiveMetaForEvidencia) return;
+                triggerArchiveEvidencia(currentActiveMetaForEvidencia.id, currentActiveMetaForEvidencia.cargo);
+            });
+        }
+
+        // Direct Archive Evidence Buttons
+        document.querySelectorAll('.js-admin-archive-evidencia-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-id');
+                const cargo = this.getAttribute('data-cargo');
+                triggerArchiveEvidencia(id, cargo);
+            });
+        });
+
+        // Direct Restore Evidence Buttons
+        document.querySelectorAll('.js-admin-restore-evidencia-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-id');
+                const cargo = this.getAttribute('data-cargo');
+                Swal.fire({
+                    title: '¿Restaurar evidencia archivada?',
+                    text: `Se recuperará la última evidencia archivada de la meta #${id} (${cargo}).`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, restaurar evidencia',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#198754'
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        const form = document.getElementById('singleRestoreEvidenciaForm');
+                        form.action = `/admin/meta/${id}/evidencia/restaurar/`;
+                        form.submit();
+                    }
+                });
+            });
+        });
+
+        // Lightbox image preview modal in admin
+        document.querySelectorAll('.js-preview-img').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const src = this.getAttribute('data-src');
+                const title = this.getAttribute('data-title');
+                const row = this.closest('tr');
+                const metaCheckbox = row ? row.querySelector('.meta-checkbox') : null;
+                const metaId = metaCheckbox ? metaCheckbox.getAttribute('data-id') : null;
+
+                document.getElementById('adminPreviewModalImg').src = src;
+                document.getElementById('adminPreviewModalLink').href = src;
+                document.getElementById('adminPreviewModalTitle').textContent = title || 'Visualización de Evidencia';
+                
+                const editBtn = document.getElementById('adminPreviewModalEditBtn');
+                const archiveBtn = document.getElementById('adminPreviewModalArchiveBtn');
+                if (metaId) {
+                    editBtn.classList.remove('d-none');
+                    archiveBtn.classList.remove('d-none');
+                    editBtn.onclick = function() {
+                        const previewModalEl = document.getElementById('adminPreviewModal');
+                        const previewModal = bootstrap.Modal.getInstance(previewModalEl);
+                        if (previewModal) previewModal.hide();
+                        const editEvidenciaBtn = row.querySelector('.js-admin-edit-evidencia-btn');
+                        if (editEvidenciaBtn) editEvidenciaBtn.click();
+                    };
+                    archiveBtn.onclick = function() {
+                        triggerArchiveEvidencia(metaId, title || '');
+                    };
+                } else {
+                    editBtn.classList.add('d-none');
+                    archiveBtn.classList.add('d-none');
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('adminPreviewModal'));
+                modal.show();
+            });
+        });
+
+        // Modal de Edición de Meta en Admin
+        document.querySelectorAll('.js-admin-edit-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-id');
+                const cargo = this.getAttribute('data-cargo');
+                const delegacion = this.getAttribute('data-delegacion');
+                const periodo = this.getAttribute('data-periodo');
+                const ponderacion = this.getAttribute('data-ponderacion');
+                const desc = this.getAttribute('data-desc');
+                const evidencia = this.getAttribute('data-evidencia');
+
+                document.getElementById('adminEditModalTitle').textContent = `Editar Meta #${id} - ${cargo}`;
+                document.getElementById('adminEditMetaForm').action = `/admin/meta/${id}/editar/`;
+                document.getElementById('edit_cargo').value = cargo;
+                document.getElementById('edit_delegacion').value = delegacion;
+                document.getElementById('edit_periodo').value = periodo;
+                document.getElementById('edit_ponderacion').value = ponderacion;
+                document.getElementById('edit_descripcion').value = desc;
+
+                // Evidencia preview inside edit meta modal
+                const previewBox = document.getElementById('edit_evidencia_preview_box');
+                const img = document.getElementById('edit_evidencia_img');
+                const link = document.getElementById('edit_evidencia_link');
+                const editMetaModalArchiveBtn = document.getElementById('edit_modal_archive_evidencia_btn');
+                if (evidencia && evidencia.trim()) {
+                    previewBox.classList.remove('d-none');
+                    img.src = evidencia;
+                    link.href = evidencia;
+                    if (editMetaModalArchiveBtn) {
+                        editMetaModalArchiveBtn.onclick = function() {
+                            triggerArchiveEvidencia(id, cargo);
+                        };
+                    }
+                } else {
+                    previewBox.classList.add('d-none');
+                    img.src = '';
+                    link.href = '';
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('adminEditMetaModal'));
+                modal.show();
+            });
+        });
+
+        // Single Archive Action
+        document.querySelectorAll('.js-archive-single-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-id');
+                Swal.fire({
+                    title: '¿Archivar esta meta?',
+                    text: 'Pasará al estado archivado (borrado lógico).',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, archivar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#ffc107'
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        const form = document.getElementById('singleArchiveForm');
+                        form.action = `/admin/meta/${id}/archivar/`;
+                        form.submit();
+                    }
+                });
+            });
+        });
+
+        // Single Restore Action
+        document.querySelectorAll('.js-restore-single-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-id');
+                Swal.fire({
+                    title: '¿Restaurar esta meta?',
+                    text: 'Volverá a estar activa en el período institucional.',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, restaurar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#198754'
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        const form = document.getElementById('singleRestoreForm');
+                        form.action = `/admin/meta/${id}/restaurar/`;
+                        form.submit();
+                    }
+                });
+            });
+        });
+
+        // Single Hard Delete Action
+        document.querySelectorAll('.js-delete-single-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.getAttribute('data-id');
+                Swal.fire({
+                    title: '¿Eliminar definitivamente?',
+                    text: 'Esta acción borrará la meta de la base de datos permanentemente.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, eliminar permanentemente',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#dc3545'
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        const form = document.getElementById('singleDeleteForm');
+                        form.action = `/admin/meta/${id}/eliminar/`;
+                        form.submit();
+                    }
+                });
+            });
+        });
     </script>
 </body>
 </html>

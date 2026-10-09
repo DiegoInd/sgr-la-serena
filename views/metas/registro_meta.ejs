@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGR La Serena - Registro de Metas</title>
+    <title>SGR La Serena - Área de Gestión de Metas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -21,43 +21,54 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-3 shadow-sm">
         <div class="container">
             <a class="navbar-brand fw-bold" href="/wireframe-front">
-                🏛️ SGR La Serena - Sistema de Gestión
+                🏛️ SGR La Serena <small class="fw-normal text-white-50">| Gestión Interna</small>
             </a>
             <div class="d-flex align-items-center">
+                <a href="/sitio-publico" class="btn btn-sm btn-outline-light me-2">Portal Ciudadano</a>
                 <a href="/catalogo-servicios" class="btn btn-sm btn-outline-light me-2">Catálogo de Servicios</a>
-                <a href="/admin/" class="btn btn-sm btn-outline-light me-3">Administración</a>
+                
+                <!-- Solo el administrador ve el botón del panel completo -->
+                <% if (user && (user.is_superuser || user.rol === 'ADMIN')) { %>
+                    <a href="/admin/" class="btn btn-sm btn-warning fw-bold text-dark me-3">⚙️ Panel Admin</a>
+                <% } %>
                 
                 <span class="navbar-text text-white d-flex align-items-center">
-                    <% if (user && user.is_authenticated) { %>
-                        <span class="me-3 small">
-                            Usuario: <strong><%= user.username %></strong> 
-                            <span class="badge bg-light text-primary ms-1"><%= user.rol %></span>
-                            | Delegación: <strong><%= user.perfilusuario && user.perfilusuario.delegacion ? user.perfilusuario.delegacion.nombre : 'Global' %></strong>
-                        </span>
-                        <form action="/logout" method="post" class="d-inline m-0">
-                            <button type="submit" class="btn btn-sm btn-light text-primary fw-bold">Cerrar Sesión</button>
-                        </form>
-                    <% } else { %>
-                        <a href="/login" class="btn btn-sm btn-light text-primary fw-bold">Ingresar</a>
-                    <% } %>
+                    <span class="me-3 small">
+                        <strong><%= user.username %></strong> 
+                        <span class="badge <%= user.rol === 'ADMIN' ? 'bg-warning text-dark' : 'bg-light text-primary' %> ms-1"><%= user.rol %></span>
+                        | Delegación: <strong><%= user.perfilusuario && user.perfilusuario.delegacion ? user.perfilusuario.delegacion.nombre : 'Global' %></strong>
+                    </span>
+                    <form action="/logout" method="post" class="d-inline m-0">
+                        <button type="submit" class="btn btn-sm btn-light text-primary fw-bold">Cerrar Sesión</button>
+                    </form>
                 </span>
             </div>
         </div>
     </nav>
 
     <div class="container mb-5">
-        <!-- Quick Switch Demo Bar for convenient testing -->
+        <!-- Quick Switch Demo Bar -->
         <div class="alert alert-light border shadow-sm d-flex flex-wrap justify-content-between align-items-center py-2 px-3 mb-3 small rounded-3">
             <div>
-                <strong class="text-secondary">Cambio rápido de perfil (Demo):</strong>
-                <a href="/demo-login/admin" class="badge text-bg-primary text-decoration-none me-1">Admin (Superusuario)</a>
-                <a href="/demo-login/funcionario1" class="badge text-bg-info text-decoration-none me-1">Funcionario Centro</a>
-                <a href="/demo-login/delegado_companias" class="badge text-bg-warning text-decoration-none me-1">Delegado Las Compañías</a>
-                <a href="/demo-login/verificador_municipal" class="badge text-bg-secondary text-decoration-none me-1">Verificador</a>
+                <strong class="text-secondary">Cambiar perfil para pruebas:</strong>
+                <a href="/demo-login/admin" class="badge <%= user.username === 'admin' ? 'bg-primary' : 'text-bg-light border text-primary' %> text-decoration-none me-1">
+                    👑 Admin (Ve todas las delegaciones y panel)
+                </a>
+                <a href="/demo-login/funcionario1" class="badge <%= user.username === 'funcionario1' ? 'bg-info text-white' : 'text-bg-light border text-info' %> text-decoration-none me-1">
+                    👤 Funcionario Centro (Solo Centro)
+                </a>
+                <a href="/demo-login/delegado_companias" class="badge <%= user.username === 'delegado_companias' ? 'bg-warning text-dark' : 'text-bg-light border text-warning' %> text-decoration-none me-1">
+                    👤 Delegado Las Compañías (Solo Las Compañías)
+                </a>
+                <a href="/demo-login/funcionario_rural" class="badge <%= user.username === 'funcionario_rural' ? 'bg-success text-white' : 'text-bg-light border text-success' %> text-decoration-none me-1">
+                    👤 Funcionario Rural (Solo Rural)
+                </a>
             </div>
-            <div>
-                <a href="/admin/" class="text-decoration-none text-primary fw-semibold">⚙️ Panel Admin &rarr;</a>
-            </div>
+            <% if (user && (user.is_superuser || user.rol === 'ADMIN')) { %>
+                <div>
+                    <a href="/admin/" class="text-decoration-none text-warning fw-bold">⚙️ Administrar Sistema &rarr;</a>
+                </div>
+            <% } %>
         </div>
 
         <!-- Flash messages -->
@@ -70,12 +81,31 @@
             <% }) %>
         <% } %>
 
+        <!-- User Scope Banner -->
+        <div class="card border-0 shadow-sm mb-3 <%= user.is_superuser || user.rol === 'ADMIN' ? 'bg-primary-subtle' : 'bg-info-subtle' %>">
+            <div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center">
+                <div>
+                    <% if (user.is_superuser || user.rol === 'ADMIN') { %>
+                        <span class="fw-bold text-primary">👑 Modo Administrador:</span>
+                        <span class="small text-secondary ms-1">Tienes acceso global para supervisar todas las delegaciones y gestionar el panel completo de mantenedores.</span>
+                    <% } else { %>
+                        <span class="fw-bold text-dark">🏢 Ámbito de tu Delegación:</span>
+                        <span class="badge bg-primary fs-6 ms-1"><%= user.perfilusuario.delegacion.nombre %></span>
+                        <span class="small text-muted ms-2">Visualizas y operas exclusivamente sobre las metas asignadas a tu territorio.</span>
+                    <% } %>
+                </div>
+                <div class="small fw-semibold text-secondary mt-1 mt-md-0">
+                    Rol: <span class="badge bg-secondary"><%= user.rol %></span>
+                </div>
+            </div>
+        </div>
+
         <!-- Ponderación Progress Bar -->
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-body py-2 px-3">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <span class="small fw-semibold text-secondary">
-                        Ponderación total acumulada (Metas activas del período): 
+                        Ponderación acumulada <%= (user.is_superuser || user.rol === 'ADMIN') ? (selectedDelegacion ? 'de la delegación seleccionada' : 'global') : `de ${user.perfilusuario.delegacion.nombre}` %>: 
                         <strong class="<%= totalPonderacion === 100 ? 'text-success' : (totalPonderacion > 100 ? 'text-danger' : 'text-primary') %>"><%= totalPonderacion %>%</strong>
                     </span>
                     <span class="badge <%= totalPonderacion === 100 ? 'bg-success' : (totalPonderacion > 100 ? 'bg-danger' : 'bg-primary') %>">
@@ -117,10 +147,12 @@
                     <% if (showArchived) { %>
                         <input type="hidden" name="status" value="archivadas">
                     <% } %>
-                    <div class="col-md-4">
-                        <input type="text" name="q" class="form-control form-control-sm" placeholder="Buscar por cargo o descripción..." value="<%= searchQuery || '' %>">
+                    <div class="<%= (user.is_superuser || user.rol === 'ADMIN') ? 'col-md-4' : 'col-md-7' %>">
+                        <input type="text" name="q" class="form-control form-control-sm" placeholder="Buscar por cargo o compromiso..." value="<%= searchQuery || '' %>">
                     </div>
-                    <% if (user && (user.is_superuser || user.rol === 'ADMIN')) { %>
+
+                    <!-- Solo el Administrador puede cambiar el filtro de delegación -->
+                    <% if (user.is_superuser || user.rol === 'ADMIN') { %>
                     <div class="col-md-3">
                         <select name="delegacion" class="form-select form-select-sm">
                             <option value="">Todas las Delegaciones</option>
@@ -130,6 +162,7 @@
                         </select>
                     </div>
                     <% } %>
+
                     <div class="col-md-3">
                         <select name="periodo" class="form-select form-select-sm">
                             <option value="">Todos los Períodos</option>
@@ -148,79 +181,184 @@
 
         <!-- Metas Table -->
         <div class="card shadow-sm border-0">
-            <div class="card-body p-0">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Cargo / Usuario</th>
-                            <th>Delegación</th>
-                            <th>Período</th>
-                            <th>Ponderación</th>
-                            <th>Descripción</th>
-                            <th>Evidencia</th>
-                            <th class="text-end pe-4">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% if (page_obj && page_obj.metas && page_obj.metas.length > 0) { %>
-                            <% page_obj.metas.forEach(meta => { %>
-                            <tr>
-                                <td>
-                                    <strong><%= meta.cargo_o_usuario %></strong>
-                                </td>
-                                <td>
-                                    <span class="badge text-bg-light border text-secondary"><%= meta.delegacionNombre %></span>
-                                </td>
-                                <td><small class="text-muted"><%= meta.periodoLabel %></small></td>
-                                <td><span class="badge bg-primary fs-6"><%= meta.ponderacion %>%</span></td>
-                                <td>
-                                    <div class="meta-desc text-muted small" title="<%= meta.descripcion %>">
-                                        <%= meta.descripcion %>
-                                    </div>
-                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small js-view-desc" 
-                                            data-cargo="<%= meta.cargo_o_usuario %>" 
-                                            data-desc="<%= meta.descripcion %>">
-                                        ver completa
-                                    </button>
-                                </td>
-                                <td>
-                                    <% if (meta.evidencia) { %>
-                                        <button type="button" class="btn btn-sm btn-outline-info js-preview-img" data-src="<%= meta.evidencia %>" data-title="<%= meta.cargo_o_usuario %>">
-                                            🔍 Ver Archivo
-                                        </button>
-                                    <% } else { %>
-                                        <span class="text-muted small">Sin evidencia</span>
-                                    <% } %>
-                                </td>
-                                <td class="text-end pe-4">
-                                    <% if (!meta.deleted_at) { %>
-                                        <% if (perms && perms.mantenedores && perms.mantenedores.change_meta) { %>
-                                            <a href="/wireframe-front/meta/<%= meta.id %>/editar/" class="btn btn-sm btn-outline-primary me-1">Editar</a>
-                                        <% } %>
-                                        <% if (perms && perms.mantenedores && perms.mantenedores.delete_meta) { %>
-                                            <form id="delete-form-<%= meta.id %>" action="/wireframe-front/meta/<%= meta.id %>/eliminar/" method="post" class="d-inline">
-                                                <button type="button" class="btn btn-sm btn-outline-danger js-delete-btn" data-id="<%= meta.id %>">Archivar</button>
-                                            </form>
-                                        <% } %>
-                                    <% } else { %>
-                                        <form id="restore-form-<%= meta.id %>" action="/wireframe-front/meta/<%= meta.id %>/restaurar/" method="post" class="d-inline">
-                                            <button type="button" class="btn btn-sm btn-outline-success js-restore-btn" data-id="<%= meta.id %>">Restaurar</button>
-                                        </form>
-                                    <% } %>
-                                </td>
-                            </tr>
-                            <% }) %>
+            <form id="frontBatchForm" action="/wireframe-front/metas/lote/" method="post">
+                <div class="p-3 bg-light border-bottom d-flex flex-wrap align-items-center gap-2">
+                    <span class="small fw-semibold text-secondary">Acción en lote para seleccionadas:</span>
+                    <select name="action" id="frontBatchActionSelect" class="form-select form-select-sm w-auto" required>
+                        <% if (!showArchived) { %>
+                            <option value="archivar">Archivar seleccionadas (Borrado Lógico)</option>
+                            <option value="eliminar">Eliminar definitivamente (Borrado Físico)</option>
                         <% } else { %>
-                            <tr>
-                                <td colspan="7" class="text-center py-5 text-muted">
-                                    <div class="fs-5 mb-1">No se encontraron metas registradas.</div>
-                                    <small><%= showArchived ? 'No existen registros archivados.' : 'Puede registrar una nueva meta con el botón superior.' %></small>
-                                </td>
-                            </tr>
+                            <option value="restaurar">Restaurar seleccionadas</option>
+                            <option value="eliminar">Eliminar definitivamente (Borrado Físico)</option>
                         <% } %>
-                    </tbody>
-                </table>
-            </div>
+                    </select>
+                    <button type="button" class="btn btn-sm btn-primary fw-bold" id="frontApplyBatchBtn">
+                        Aplicar a seleccionadas
+                    </button>
+                    <span id="frontSelectedCountBadge" class="badge bg-secondary ms-2">0 seleccionadas</span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 45px;" class="text-center">
+                                    <input type="checkbox" id="selectAllMetas" class="form-check-input" title="Seleccionar todas">
+                                </th>
+                                <th>Cargo / Funcionario (Click para editar)</th>
+                                <th>Delegación</th>
+                                <th>Período</th>
+                                <th>Ponderación</th>
+                                <th>Descripción del Compromiso</th>
+                                <th>Evidencia</th>
+                                <th class="text-end pe-4">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (page_obj && page_obj.metas && page_obj.metas.length > 0) { %>
+                                <% page_obj.metas.forEach(meta => { %>
+                                <% const canManage = user && (user.is_superuser || user.rol === 'ADMIN' || (user.perfilusuario && user.perfilusuario.delegacion && meta.delegacion_id === user.delegacion_id)); %>
+                                <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox" name="meta_ids" value="<%= meta.id %>" class="form-check-input meta-checkbox" data-id="<%= meta.id %>" <%= !canManage ? 'disabled title="Solo lectura para tu perfil"' : '' %>>
+                                    </td>
+                                    <td>
+                                        <% if (canManage) { %>
+                                            <!-- Click directo en la meta para editarla -->
+                                            <a href="/wireframe-front/meta/<%= meta.id %>/editar/" 
+                                               class="fw-bold text-decoration-none text-primary" 
+                                               title="Haga clic para editar esta meta institucional">
+                                                ✏️ <%= meta.cargo_o_usuario %>
+                                            </a>
+                                        <% } else { %>
+                                            <strong><%= meta.cargo_o_usuario %></strong>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <span class="badge text-bg-light border text-secondary"><%= meta.delegacionNombre %></span>
+                                    </td>
+                                    <td><small class="text-muted"><%= meta.periodoLabel %></small></td>
+                                    <td><span class="badge bg-primary fs-6"><%= meta.ponderacion %>%</span></td>
+                                    <td>
+                                        <div class="meta-desc text-muted small" title="<%= meta.descripcion %>">
+                                            <%= meta.descripcion %>
+                                        </div>
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small js-view-desc" 
+                                                data-cargo="<%= meta.cargo_o_usuario %>" 
+                                                data-desc="<%= meta.descripcion %>">
+                                            ver completa
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <% if (meta.evidencia) { %>
+                                            <div>
+                                                <div class="d-flex align-items-center gap-1 mb-1">
+                                                    <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 js-preview-img" 
+                                                            data-src="<%= meta.evidencia %>" 
+                                                            data-title="<%= meta.cargo_o_usuario %>" 
+                                                            data-id="<%= meta.id %>"
+                                                            data-can-manage="<%= canManage ? 'true' : 'false' %>">
+                                                        🔍 Ver Archivo
+                                                    </button>
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.72rem;">Adjunta</span>
+                                                </div>
+                                                <% if (canManage) { %>
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 js-front-edit-evidencia-btn" 
+                                                                data-id="<%= meta.id %>" 
+                                                                data-cargo="<%= meta.cargo_o_usuario %>" 
+                                                                data-evidencia="<%= meta.evidencia %>" 
+                                                                title="Editar o cambiar archivo de evidencia">
+                                                            ✏️ Editar
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2 js-front-archive-evidencia-btn" 
+                                                                data-id="<%= meta.id %>" 
+                                                                data-cargo="<%= meta.cargo_o_usuario %>" 
+                                                                title="Archivar evidencia de esta meta">
+                                                            📦 Archivar
+                                                        </button>
+                                                    </div>
+                                                <% } %>
+                                                <% if (meta.evidencias_archivadas && meta.evidencias_archivadas.length > 0) { %>
+                                                    <div class="mt-1">
+                                                        <span class="badge bg-light text-secondary border" style="font-size: 0.7rem;">
+                                                            📦 <%= meta.evidencias_archivadas.length %> previa(s)
+                                                        </span>
+                                                    </div>
+                                                <% } %>
+                                            </div>
+                                        <% } else { %>
+                                            <div>
+                                                <span class="text-muted small d-block mb-1">Sin evidencia</span>
+                                                <% if (canManage) { %>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 js-front-edit-evidencia-btn" 
+                                                            data-id="<%= meta.id %>" 
+                                                            data-cargo="<%= meta.cargo_o_usuario %>" 
+                                                            data-evidencia="" 
+                                                            title="Subir archivo de evidencia">
+                                                        ➕ Subir
+                                                    </button>
+                                                    <% if (meta.evidencias_archivadas && meta.evidencias_archivadas.length > 0) { %>
+                                                        <div class="mt-1">
+                                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size: 0.7rem;">
+                                                                📦 <%= meta.evidencias_archivadas.length %> previa(s)
+                                                            </span>
+                                                            <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none ms-1 js-front-restore-evidencia-btn" 
+                                                                    data-id="<%= meta.id %>" 
+                                                                    data-cargo="<%= meta.cargo_o_usuario %>" 
+                                                                    style="font-size: 0.75rem;" 
+                                                                    title="Restaurar última evidencia archivada">
+                                                                Restaurar
+                                                            </button>
+                                                        </div>
+                                                    <% } %>
+                                                <% } %>
+                                            </div>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <% if (!meta.deleted_at) { %>
+                                            <% if (canManage && perms && perms.mantenedores && perms.mantenedores.change_meta) { %>
+                                                <a href="/wireframe-front/meta/<%= meta.id %>/editar/" class="btn btn-sm btn-outline-primary me-1">Editar</a>
+                                            <% } %>
+                                            <% if (canManage && perms && perms.mantenedores && perms.mantenedores.delete_meta) { %>
+                                                <form id="delete-form-<%= meta.id %>" action="/wireframe-front/meta/<%= meta.id %>/eliminar/" method="post" class="d-inline me-1">
+                                                    <button type="button" class="btn btn-sm btn-outline-warning js-delete-btn" data-id="<%= meta.id %>" title="Archivar (borrado lógico)">Archivar</button>
+                                                </form>
+                                                <form id="hard-delete-form-<%= meta.id %>" action="/wireframe-front/meta/<%= meta.id %>/eliminar-definitivo/" method="post" class="d-inline">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger js-hard-delete-btn" data-id="<%= meta.id %>" title="Eliminar definitivamente de la base de datos">Eliminar</button>
+                                                </form>
+                                            <% } %>
+                                            <% if (!canManage) { %>
+                                                <span class="text-muted small">Solo lectura</span>
+                                            <% } %>
+                                        <% } else { %>
+                                            <% if (canManage) { %>
+                                                <form id="restore-form-<%= meta.id %>" action="/wireframe-front/meta/<%= meta.id %>/restaurar/" method="post" class="d-inline me-1">
+                                                    <button type="button" class="btn btn-sm btn-outline-success js-restore-btn" data-id="<%= meta.id %>">Restaurar</button>
+                                                </form>
+                                                <form id="hard-delete-form-<%= meta.id %>" action="/wireframe-front/meta/<%= meta.id %>/eliminar-definitivo/" method="post" class="d-inline">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger js-hard-delete-btn" data-id="<%= meta.id %>">Eliminar</button>
+                                                </form>
+                                            <% } else { %>
+                                                <span class="text-muted small">Archivada</span>
+                                            <% } %>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">
+                                        <div class="fs-5 mb-1">No se encontraron metas registradas para esta delegación.</div>
+                                        <small><%= showArchived ? 'No existen registros archivados.' : 'Puedes registrar una nueva meta institucional con el botón superior.' %></small>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </form>
 
             <!-- Footer: Selector de Paginación y Botones -->
             <% if (page_obj && page_obj.paginator && page_obj.paginator.count > 0) { %>
@@ -274,15 +412,22 @@
                         <a href="/wireframe-front" class="btn-close btn-close-white"></a>
                     </div>
                     <div class="modal-body">
+                        <!-- Delegación: solo editable por Administrador -->
                         <% if (user && (user.is_superuser || user.rol === 'ADMIN')) { %>
-                        <div class="mb-3">
-                            <label for="id_delegacion" class="form-label fw-semibold">Delegación Asignada:</label>
-                            <select name="delegacion" id="id_delegacion" class="form-select" required>
-                                <% delegaciones.forEach(d => { %>
-                                    <option value="<%= d.id %>" <%= (form.delegacion == d.id) ? 'selected' : '' %>><%= d.nombre %> <%= !d.activa ? '(Inactiva)' : '' %></option>
-                                <% }) %>
-                            </select>
-                        </div>
+                            <div class="mb-3">
+                                <label for="id_delegacion" class="form-label fw-semibold">Delegación Asignada:</label>
+                                <select name="delegacion" id="id_delegacion" class="form-select" required>
+                                    <% delegaciones.forEach(d => { %>
+                                        <option value="<%= d.id %>" <%= (form.delegacion == d.id) ? 'selected' : '' %>><%= d.nombre %> <%= !d.activa ? '(Inactiva)' : '' %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                        <% } else { %>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Delegación Responsable:</label>
+                                <input type="text" class="form-control bg-light" value="<%= user.perfilusuario.delegacion.nombre %>" readonly>
+                                <small class="text-muted">Asignada automáticamente a tu delegación territorial.</small>
+                            </div>
                         <% } %>
 
                         <div class="mb-3">
@@ -342,7 +487,7 @@
     <!-- Modal Previsualización de Evidencia -->
     <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
+            <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-dark text-white">
                     <h5 class="modal-title fw-bold" id="previewModalTitle">Evidencia Adjunta</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -350,13 +495,64 @@
                 <div class="modal-body text-center p-3 bg-light">
                     <img id="previewModalImg" src="" alt="Evidencia" class="img-fluid rounded shadow-sm border" style="max-height: 500px; object-fit: contain;">
                 </div>
-                <div class="modal-footer">
-                    <a id="previewModalLink" href="" target="_blank" class="btn btn-sm btn-outline-primary">Abrir en pestaña nueva</a>
-                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <div class="modal-footer d-flex justify-content-between">
+                    <div>
+                        <button type="button" id="previewModalEditBtn" class="btn btn-sm btn-outline-primary me-2 d-none">
+                            ✏️ Editar Evidencia
+                        </button>
+                        <button type="button" id="previewModalArchiveBtn" class="btn btn-sm btn-outline-warning d-none">
+                            📦 Archivar Evidencia
+                        </button>
+                    </div>
+                    <div>
+                        <a id="previewModalLink" href="" target="_blank" class="btn btn-sm btn-outline-primary me-2">Abrir en pestaña nueva</a>
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Modal: Editar / Cargar Evidencia (Front) -->
+    <div class="modal fade" id="frontEvidenciaModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow">
+                <form id="frontEvidenciaForm" method="post" enctype="multipart/form-data">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title fw-bold" id="frontEvidenciaModalTitle">Gestionar Evidencia</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="frontCurrentEvidenciaBox" class="mb-3 p-3 bg-light rounded border text-center d-none">
+                            <label class="form-label fw-bold text-muted small d-block text-start mb-2">Evidencia Actual Adjunta:</label>
+                            <img id="frontEvidenciaPreviewThumb" src="" alt="Vista previa" class="img-fluid rounded border mb-2" style="max-height: 160px; object-fit: contain;">
+                            <div class="d-flex justify-content-center gap-2">
+                                <a id="frontEvidenciaFullLink" href="" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    🔍 Ver Completa
+                                </a>
+                                <button type="button" id="frontEvidenciaModalArchiveBtn" class="btn btn-sm btn-outline-warning">
+                                    📦 Archivar esta evidencia
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" id="frontEvidenciaInputLabel">Seleccionar archivo de evidencia (JPG o PNG, máx 2MB):</label>
+                            <input type="file" name="evidencia" id="frontEvidenciaInputFile" class="form-control" accept=".jpg,.jpeg,.png" required>
+                            <div class="form-text">Formatos permitidos: .jpg, .jpeg, .png. Tamaño máximo: 2 MB.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold" id="frontEvidenciaSubmitBtn">Guardar Evidencia</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formularios ocultos para acciones de Evidencia (Front) -->
+    <form id="frontArchiveEvidenciaForm" method="post" style="display:none;"></form>
+    <form id="frontRestoreEvidenciaForm" method="post" style="display:none;"></form>
 
     <!-- Modal Descripción Completa -->
     <div class="modal fade" id="descModal" tabindex="-1" aria-hidden="true">
@@ -378,7 +574,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Auto open form modal if open_modal is true
         <% if (open_modal) { %>
             document.addEventListener("DOMContentLoaded", function () {
                 const modalElement = document.getElementById("metaModal");
@@ -388,6 +583,183 @@
                 }
             });
         <% } %>
+
+        // Checkboxes y selección de metas en lote (Front)
+        const selectAllFront = document.getElementById("selectAllMetas");
+        const frontCheckboxes = document.querySelectorAll(".meta-checkbox");
+        const frontBadge = document.getElementById("frontSelectedCountBadge");
+
+        function updateFrontCount() {
+            const checked = document.querySelectorAll(".meta-checkbox:checked").length;
+            if (frontBadge) frontBadge.textContent = checked + " seleccionada(s)";
+            if (selectAllFront) {
+                const enabledCheckboxes = document.querySelectorAll(".meta-checkbox:not(:disabled)");
+                selectAllFront.checked = enabledCheckboxes.length > 0 && checked === enabledCheckboxes.length;
+            }
+        }
+
+        if (selectAllFront) {
+            selectAllFront.addEventListener("change", function () {
+                frontCheckboxes.forEach(cb => {
+                    if (!cb.disabled) cb.checked = this.checked;
+                });
+                updateFrontCount();
+            });
+        }
+
+        frontCheckboxes.forEach(cb => {
+            cb.addEventListener("change", updateFrontCount);
+        });
+
+        // Botón de Aplicar Acciones en Lote (Front)
+        const applyBatchBtn = document.getElementById("frontApplyBatchBtn");
+        if (applyBatchBtn) {
+            applyBatchBtn.addEventListener("click", function () {
+                const count = document.querySelectorAll(".meta-checkbox:checked").length;
+                if (count === 0) {
+                    Swal.fire({
+                        icon: "warning",
+                        title: "Sin selección",
+                        text: "Por favor selecciona al menos una meta con la casilla correspondiente."
+                    });
+                    return;
+                }
+
+                const action = document.getElementById("frontBatchActionSelect").value;
+                let title = "¿Confirmar acción en lote?";
+                let text = `Se aplicará la acción a ${count} meta(s) seleccionada(s).`;
+                let confirmBtn = "Sí, continuar";
+                let confirmColor = "#0d6efd";
+
+                if (action === "eliminar") {
+                    title = "¿Eliminar definitivamente las metas seleccionadas?";
+                    text = `Se borrarán permanentemente ${count} meta(s) de la base de datos. ¡No se puede deshacer!`;
+                    confirmBtn = "Sí, eliminar definitivamente";
+                    confirmColor = "#dc3545";
+                } else if (action === "archivar") {
+                    title = "¿Archivar las metas seleccionadas?";
+                    text = `${count} meta(s) pasarán al estado archivado (borrado lógico).`;
+                    confirmBtn = "Sí, archivar";
+                    confirmColor = "#ffc107";
+                } else if (action === "restaurar") {
+                    title = "¿Restaurar las metas seleccionadas?";
+                    text = `${count} meta(s) volverán a estar activas en el período correspondiente.`;
+                    confirmBtn = "Sí, restaurar";
+                    confirmColor = "#198754";
+                }
+
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: action === "eliminar" ? "warning" : "question",
+                    showCancelButton: true,
+                    confirmButtonText: confirmBtn,
+                    cancelButtonText: "Cancelar",
+                    confirmButtonColor: confirmColor
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById("frontBatchForm").submit();
+                    }
+                });
+            });
+        }
+
+        let currentFrontMetaForEvidencia = null;
+
+        function triggerFrontArchiveEvidencia(id, cargo) {
+            Swal.fire({
+                title: "¿Archivar evidencia?",
+                text: `Se retirará el archivo de evidencia de la meta #${id} (${cargo}) y pasará al historial de evidencias archivadas sin eliminar la meta institucional.`,
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: "Sí, archivar evidencia",
+                cancelButtonText: "Cancelar",
+                confirmButtonColor: "#ffc107"
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const form = document.getElementById("frontArchiveEvidenciaForm");
+                    form.action = `/wireframe-front/meta/${id}/evidencia/archivar/`;
+                    form.submit();
+                }
+            });
+        }
+
+        // Abrir modal para editar / subir evidencia desde el Front
+        document.querySelectorAll(".js-front-edit-evidencia-btn").forEach(btn => {
+            btn.addEventListener("click", function () {
+                const id = this.getAttribute("data-id");
+                const cargo = this.getAttribute("data-cargo");
+                const evidencia = this.getAttribute("data-evidencia");
+                currentFrontMetaForEvidencia = { id, cargo, evidencia };
+
+                document.getElementById("frontEvidenciaModalTitle").textContent = `Gestionar Evidencia - Meta #${id} (${cargo})`;
+                document.getElementById("frontEvidenciaForm").action = `/wireframe-front/meta/${id}/evidencia/editar/`;
+
+                const container = document.getElementById("frontCurrentEvidenciaBox");
+                const thumb = document.getElementById("frontEvidenciaPreviewThumb");
+                const link = document.getElementById("frontEvidenciaFullLink");
+                const fileInput = document.getElementById("frontEvidenciaInputFile");
+                fileInput.value = "";
+
+                if (evidencia && evidencia.trim()) {
+                    container.classList.remove("d-none");
+                    thumb.src = evidencia;
+                    link.href = evidencia;
+                    document.getElementById("frontEvidenciaInputLabel").textContent = "Reemplazar por nueva evidencia (JPG o PNG, máx 2MB):";
+                    document.getElementById("frontEvidenciaSubmitBtn").textContent = "Guardar / Reemplazar";
+                } else {
+                    container.classList.add("d-none");
+                    thumb.src = "";
+                    link.href = "";
+                    document.getElementById("frontEvidenciaInputLabel").textContent = "Seleccionar archivo de evidencia (JPG o PNG, máx 2MB):";
+                    document.getElementById("frontEvidenciaSubmitBtn").textContent = "Subir Evidencia";
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById("frontEvidenciaModal"));
+                modal.show();
+            });
+        });
+
+        // Botón archivar dentro del modal
+        const frontModalArchiveBtn = document.getElementById("frontEvidenciaModalArchiveBtn");
+        if (frontModalArchiveBtn) {
+            frontModalArchiveBtn.addEventListener("click", function () {
+                if (!currentFrontMetaForEvidencia) return;
+                triggerFrontArchiveEvidencia(currentFrontMetaForEvidencia.id, currentFrontMetaForEvidencia.cargo);
+            });
+        }
+
+        // Botón archivar directo en tabla
+        document.querySelectorAll(".js-front-archive-evidencia-btn").forEach(btn => {
+            btn.addEventListener("click", function () {
+                const id = this.getAttribute("data-id");
+                const cargo = this.getAttribute("data-cargo");
+                triggerFrontArchiveEvidencia(id, cargo);
+            });
+        });
+
+        // Botón restaurar directo en tabla
+        document.querySelectorAll(".js-front-restore-evidencia-btn").forEach(btn => {
+            btn.addEventListener("click", function () {
+                const id = this.getAttribute("data-id");
+                const cargo = this.getAttribute("data-cargo");
+                Swal.fire({
+                    title: "¿Restaurar evidencia archivada?",
+                    text: `Se recuperará la última evidencia archivada de la meta #${id} (${cargo}).`,
+                    icon: "question",
+                    showCancelButton: true,
+                    confirmButtonText: "Sí, restaurar evidencia",
+                    cancelButtonText: "Cancelar",
+                    confirmButtonColor: "#198754"
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        const form = document.getElementById("frontRestoreEvidenciaForm");
+                        form.action = `/wireframe-front/meta/${id}/evidencia/restaurar/`;
+                        form.submit();
+                    }
+                });
+            });
+        });
 
         // SweetAlert2 for Delete/Archive confirmation
         document.querySelectorAll(".js-delete-btn").forEach(button => {
@@ -400,10 +772,30 @@
                     showCancelButton: true,
                     confirmButtonText: "Sí, archivar",
                     cancelButtonText: "Cancelar",
-                    confirmButtonColor: "#dc3545"
+                    confirmButtonColor: "#ffc107"
                 }).then((result) => {
                     if (result.isConfirmed) {
                         document.getElementById(`delete-form-${metaId}`).submit();
+                    }
+                });
+            });
+        });
+
+        // SweetAlert2 for Permanent Hard Delete confirmation
+        document.querySelectorAll(".js-hard-delete-btn").forEach(button => {
+            button.addEventListener("click", function () {
+                const metaId = this.getAttribute("data-id");
+                Swal.fire({
+                    title: "¿Eliminar definitivamente?",
+                    text: "Esta acción borrará la meta de la base de datos permanentemente. ¡No se puede deshacer!",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "Sí, eliminar permanentemente",
+                    cancelButtonText: "Cancelar",
+                    confirmButtonColor: "#dc3545"
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById(`hard-delete-form-${metaId}`).submit();
                     }
                 });
             });
@@ -434,9 +826,32 @@
             btn.addEventListener("click", function () {
                 const src = this.getAttribute("data-src");
                 const title = this.getAttribute("data-title");
+                const id = this.getAttribute("data-id");
+                const canManage = this.getAttribute("data-can-manage") === "true";
+
                 document.getElementById("previewModalImg").src = src;
                 document.getElementById("previewModalLink").href = src;
                 document.getElementById("previewModalTitle").textContent = "Evidencia: " + title;
+
+                const editBtn = document.getElementById("previewModalEditBtn");
+                const archiveBtn = document.getElementById("previewModalArchiveBtn");
+                if (canManage && id) {
+                    editBtn.classList.remove("d-none");
+                    archiveBtn.classList.remove("d-none");
+                    editBtn.onclick = function() {
+                        const pm = bootstrap.Modal.getInstance(document.getElementById("previewModal"));
+                        if (pm) pm.hide();
+                        const editTrigger = document.querySelector(`.js-front-edit-evidencia-btn[data-id="${id}"]`);
+                        if (editTrigger) editTrigger.click();
+                    };
+                    archiveBtn.onclick = function() {
+                        triggerFrontArchiveEvidencia(id, title);
+                    };
+                } else {
+                    editBtn.classList.add("d-none");
+                    archiveBtn.classList.add("d-none");
+                }
+
                 const modal = new bootstrap.Modal(document.getElementById("previewModal"));
                 modal.show();
             });

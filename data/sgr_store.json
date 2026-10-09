@@ -70,7 +70,7 @@
       "id": 1,
       "username": "admin",
       "email": "admin@laserena.cl",
-      "passwordHash": "$2a$08$eegsXA5ZDc6oosRDCh/4puJSATg5TmP6fLYYRgGko6hPq1knmr4de",
+      "passwordHash": "$2a$08$dDDT7dzQ2HfX2HVFbk0raOFonot6CYinwbat3XmBdSXpyF0KJwvum",
       "is_superuser": true,
       "delegacion_id": 1,
       "rol": "ADMIN"
@@ -79,7 +79,7 @@
       "id": 2,
       "username": "funcionario1",
       "email": "funcionario@laserena.cl",
-      "passwordHash": "$2a$08$A/P75gK/4m/5aT/YyCPzeuBE6rzcSvFD9PjEF4nq5zPQC2YgZotFe",
+      "passwordHash": "$2a$08$hU6IPauxFix6T.ycu8ozTeyybzjdJBH33PmO2qvDtpwKxx9gq2aCG",
       "is_superuser": false,
       "delegacion_id": 1,
       "rol": "FUNCIONARIO"
@@ -88,16 +88,25 @@
       "id": 3,
       "username": "delegado_companias",
       "email": "delegado@laserena.cl",
-      "passwordHash": "$2a$08$7/S.OpsCFLP6Jl.IGgCHie4Hrynro.Wor6P61IoQABRP8MGN0yBN2",
+      "passwordHash": "$2a$08$57RogWpjxGFw126sZ9BLkOh4TlIiSPnsFhm9LOfG584/d5iP68B4e",
       "is_superuser": false,
       "delegacion_id": 2,
       "rol": "DELEGADO"
     },
     {
       "id": 4,
+      "username": "funcionario_rural",
+      "email": "rural@laserena.cl",
+      "passwordHash": "$2a$08$cSP3RE4xDPe64t8nhOESm.FpTnhjheZOjw6/dY0fM0H55ghh5RBkG",
+      "is_superuser": false,
+      "delegacion_id": 3,
+      "rol": "FUNCIONARIO"
+    },
+    {
+      "id": 5,
       "username": "verificador_municipal",
       "email": "verificador@laserena.cl",
-      "passwordHash": "$2a$08$.FZyL/WuLwlcL0KLGU/9hO8B.XHOVGXguUjHUj2Aecgd9UTFRerTm",
+      "passwordHash": "$2a$08$m4S7ap2rZIpId38Qppvd.OVMG4bMYAB42kppB1R/KkOm1GpC/cfN6",
       "is_superuser": false,
       "delegacion_id": 1,
       "rol": "VERIFICADOR"
@@ -112,7 +121,8 @@
       "ponderacion": 30,
       "periodo_id": 1,
       "evidencia": "/media/evidencias/2026/10/hjhjhjj.jpg",
-      "deleted_at": null
+      "deleted_at": null,
+      "evidencias_archivadas": []
     },
     {
       "id": 2,
@@ -128,7 +138,7 @@
       "id": 3,
       "delegacion_id": 1,
       "cargo_o_usuario": "Encargado de Gestión Social",
-      "descripcion": "Seguimiento y apoyo a programas sociales en sectores prioritarios.",
+      "descripcion": "Seguimiento y apoyo a programas sociales en sectores prioritarios del centro.",
       "ponderacion": 30,
       "periodo_id": 1,
       "evidencia": null,
@@ -138,29 +148,48 @@
       "id": 4,
       "delegacion_id": 2,
       "cargo_o_usuario": "Jefe de Delegación Las Compañías",
-      "descripcion": "Supervisión general de operativos y servicios municipales descentralizados.",
+      "descripcion": "Supervisión general de operativos y servicios municipales descentralizados en el sector Las Compañías.",
       "ponderacion": 50,
+      "periodo_id": 1,
+      "evidencia": null,
+      "deleted_at": null
+    },
+    {
+      "id": 5,
+      "delegacion_id": 2,
+      "cargo_o_usuario": "Inspector Territorial Las Compañías",
+      "descripcion": "Fiscalización y control de ordenanza municipal en ferias libres y comercio sectorial.",
+      "ponderacion": 50,
+      "periodo_id": 1,
+      "evidencia": null,
+      "deleted_at": null
+    },
+    {
+      "id": 6,
+      "delegacion_id": 3,
+      "cargo_o_usuario": "Gestor Comunitario Rural",
+      "descripcion": "Operativos de abastecimiento de agua y apoyo técnico social a juntas de vecinos de Algarrobito y El Romero.",
+      "ponderacion": 60,
+      "periodo_id": 1,
+      "evidencia": null,
+      "deleted_at": null
+    },
+    {
+      "id": 7,
+      "delegacion_id": 3,
+      "cargo_o_usuario": "Coordinador Operativo Rural",
+      "descripcion": "Mantenimiento de caminos vecinales y coordinación con APR en localidades rurales.",
+      "ponderacion": 40,
       "periodo_id": 1,
       "evidencia": null,
       "deleted_at": null
     }
   ],
-  "resetCodes": [
-    {
-      "id": 1,
-      "user_id": 1,
-      "code_hash": "$2a$08$T5c1ufHI4vk014pT0lGY3.i7k/bMHhxC0xm7LIH4aoeFQuTdSpbG.",
-      "raw_code": "992516",
-      "created_at": "2026-10-08T23:19:26.272Z",
-      "expires_at": "2026-10-08T23:21:26.272Z",
-      "is_used": true,
-      "failed_attempts": 0
-    }
-  ],
-  "nextMetaId": 6,
-  "nextResetCodeId": 2,
+  "resetCodes": [],
+  "nextMetaId": 8,
+  "nextResetCodeId": 1,
   "nextDelegacionId": 5,
   "nextPeriodoId": 3,
   "nextServicioId": 5,
-  "nextUserId": 5
+  "nextUserId": 6
 }
